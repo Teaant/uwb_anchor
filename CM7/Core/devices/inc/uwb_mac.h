@@ -188,6 +188,7 @@ typedef struct{
  */
 //24 * 4ms = 96ms
 
+//标签节点出现了ENABLE_COMP调用之后马上就进入了中断，所以在此处我把中断标志先清除了然后再使能，之后就没再出现了
 #define ENABLE_COMP1(htim)		__HAL_TIM_CLEAR_FLAG(htim, TIM_FLAG_CC1);\
 								__HAL_TIM_ENABLE_IT(htim, TIM_IT_CC1)
 

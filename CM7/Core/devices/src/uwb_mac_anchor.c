@@ -83,7 +83,6 @@ void initAnchor(void){
 	for(int i =0; i< 51; i++){
 		memset((uint8_t*)(ranging_tags_value+i), 0, sizeof(UWB_RangingValue_t));
 	}
-
 	//使能PDOA
 	UWB_ENABLE_RX(&uwb_node.device->ports[1]);
 	UWB_ENABLE_RX(&uwb_node.device->ports[2]);
@@ -222,7 +221,6 @@ void prepare_beacon(uint16_t id){
 	start_cap_microSlot = 1 + ranging_groups * 9 ;
 	//关闭接收
 	UWB_Write_Tx_Buffer( uwb_node.txBuffer, BEACON_COM_LEN + ranging_num * 2);
-
 	Anchor_Set_Compare(SUPERFRAME_TB_NUM -1, send_beacon);
 
 }
@@ -263,6 +261,7 @@ void Anchor_Inc_Group(void){
 
 //还是决定把这个任务交给main函数
 void start_prepare_beacon(void){
+	//这个地方有一个16就真的很奇怪，假设现在是因为标签的原因？   但是为什么呢？
 	enqueueTask(prepare_beacon,  uwb_node.id);
 }
 
@@ -273,8 +272,9 @@ void poll_timeout_cb(uint8_t _index){
 	//记录absence
 	ranging_tags_value[_index].ptag->slot_alloc.absence ++;
 	//本次测距不能正常完成 ！
-	ranging_tags_value[_index].is_valid = 0;  //为什么这个一直在设置的？
-//	Anchor_Stop_CompareTag((_index%3)+1);  //怎么机上这个就会出问题的？
+	ranging_tags_value[_index].is_valid = 0;
+	//Tanya
+	Anchor_Stop_CompareTag((_index%3)+1);  //可算是没有继续了
 
 }
 
@@ -343,7 +343,6 @@ void final_timeout_cb1(uint8_t _index){
 
 }
 
-
 void anchor_parse_ranging(uint16_t microSlot){
 
 	uint8_t isCFP = 0;
@@ -383,7 +382,6 @@ void anchor_parse_ranging(uint16_t microSlot){
 			Anchor_Stop_CompareTag((macroSlot -1)%3 +1);
 			//这不应该是先出现的吗？
 			ranging_tags_value[macroSlot -1].poll_rx_ts = get_rx_timestamp_u64(&uwb_node.device->ports[0]);
-			//关闭超时   先按照严苛的时间同步来考虑
 			ranging_tags_value[macroSlot -1].sequence = uwb_node.header.sequence;
 			ranging_tags_value[macroSlot -1].ptag->slot_alloc.absence = 0;
 			//设置Resp的发送

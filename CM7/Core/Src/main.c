@@ -341,11 +341,16 @@ void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim){
 		}
 	}
 	if (htim->Channel == HAL_TIM_ACTIVE_CHANNEL_3) {
-
+#if(Tanya_Test_Timer)
+		HAL_GPIO_TogglePin(LED3_GPIO_Port, LED3_Pin);
+		Reset_Timer();   //�?新
+		Tag_Set_Compare(40, test_callback);
+#else
 		//休眠
 		DISABLE_COMP3(htim);
 		HAL_GPIO_TogglePin(LED3_GPIO_Port, LED3_Pin);
 		tag_wakeup_radio();
+#endif
 
 	}
 	if (htim->Channel == HAL_TIM_ACTIVE_CHANNEL_4) {

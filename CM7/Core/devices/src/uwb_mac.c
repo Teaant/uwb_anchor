@@ -19,16 +19,18 @@ volatile UWB_Node_t uwb_node = {
 
 		.id = MY_ID,
 		.pan_id = PAN_ID,
-		.interval = 2,
+#if(RANGING_ROLE == TAG)
+		.interval = TAG_INTERVAL,
+#endif
 		.uwb_phy_init = uwbInit,
 
 };
 
-
 Timer_t my_timer = {0,};
 
-
 uint8_t initNode(uint8_t role, TIM_HandleTypeDef* htim){
+
+	init_mem_pool();
 
 	uwb_node.role = role;
 	my_timer.htim = htim;
@@ -52,7 +54,7 @@ void Reset_Timer(void) {
 
 	//失能比较输出中断
 #if(RANGING_ROLE == TAG)
-	DISABLE_COMP(my_timer.htim);
+	DISABLE_COMP2(my_timer.htim);
 #else
 	DISABLE_COMP1(my_timer.htim);
 #endif
@@ -77,9 +79,9 @@ uint16_t get_now_microSlot(void){
 void Tag_Set_Compare(uint32_t next_compare, compare_callback callback){
 	//设置pulse
 	my_timer.comp_value = next_compare;
-	my_timer.htim->Instance->CCR2 = my_timer.comp_value;
+	my_timer.htim->Instance->CCR2 = my_timer.comp_value;   //难道不应该是先设置这边然后？
 	my_timer.callback = callback;
-	ENABLE_COMP(my_timer.htim);
+	ENABLE_COMP2(my_timer.htim);   //为什么时马上就产生中断了家人们？哈？这是为什么呢
 }
 
 void Tag_Set_Waiting(uint32_t delta_time, compare_callback callback){
@@ -88,15 +90,17 @@ void Tag_Set_Waiting(uint32_t delta_time, compare_callback callback){
 	my_timer.htim->Instance->CCR2 = my_timer.comp_value;
 	my_timer.callback = callback;
 	//使能中断
-	ENABLE_COMP(my_timer.htim);
+	ENABLE_COMP2(my_timer.htim);
 }
 
 //标签用于休眠的定时计数器
 void Tag_Set_GotoSleep(uint32_t wakeup_time){
 
+	//关闭接收
+//	UWB_DISABLE_RX(&uwb_node.device->ports[0]);
 	my_timer.htim->Instance->CCR3 = wakeup_time;
-	UWB_DISABLE_RX(&uwb_node.device->ports[0]);
 	//使能中断
+	DISABLE_COMP2(my_timer.htim);
 	ENABLE_COMP3(my_timer.htim);
 
 }
@@ -104,9 +108,10 @@ void Tag_Set_GotoSleep(uint32_t wakeup_time){
 void Tag_Start_Monitor(void){
 
 	my_timer.htim->Instance->CCR4 = uwb_node.interval * 3 * SUPERFRAME_TB_NUM;
-	ENABLE_COMP4(my_timer.htim);
+	ENABLE_COMP4(my_timer.htim); //我是设置了这个然后啊，不是咱就是说初始化也不必是
 
 }
+
 
 
 #else
@@ -127,7 +132,7 @@ void Anchor_Set_CompareTag(uint8_t tag_index, uint32_t next_compare, anchor_tag_
 		my_timer.htim->Instance->CCR2 = next_compare;
 		my_timer.callback1 = callback;
 		my_timer.param1 = param;
-		ENABLE_COMP(my_timer.htim);
+		ENABLE_COMP2(my_timer.htim);
 		break;
 	case 2:
 		my_timer.htim->Instance->CCR3 = next_compare;
@@ -151,7 +156,7 @@ void Anchor_Stop_CompareTag(uint8_t tag_index){
 
 	switch(tag_index){
 	case 1:
-		DISABLE_COMP(my_timer.htim);
+		DISABLE_COMP2(my_timer.htim);
 		break;
 	case 2:
 		DISABLE_COMP3(my_timer.htim);
@@ -164,50 +169,6 @@ void Anchor_Stop_CompareTag(uint8_t tag_index){
 }
 
 #endif
-
-//static void uwb_handle_ack(UWB_Ranging_ACK_t* pdata){
-//	float distance;
-//	int64_t tof_dtu = pdata->tof_dtu;
-//	distance = (float) tof_dtu * DWT_TIME_UNITS * SPEED_OF_LIGHT;
-//	//或者其实也可以直接把
-//	if (distance < 0.3) {
-//		distance = 0.3;
-//	}
-//	//Tanya_add keep the distance calculate
-//	//	uwb_distance_filter(&Ranging.ranging_node, distance);
-//
-//}
-///**
-// * poll tx resp rx 时间戳
-// * 发送final帧
-// */
-//static void uwb_handle_resp(void){
-//
-//	/**
-//	 * @TODO  handle resp
-//	 * 还需要再比对一些东西，比如sequence之类的
-//	 */
-//	uint32 final_tx_time;
-//	uwb_node.ranging_values.poll_tx_ts = get_tx_timestamp_u64(&(uwb_node.device->ports[0]));
-//	uwb_node.ranging_values.resp_rx_ts = get_rx_timestamp_u64(&(uwb_node.device->ports[0]));
-//	/* Compute final message transmission time. See NOTE 10 below. */
-//	final_tx_time = (uwb_node.ranging_values.resp_rx_ts + (RESP_RX_TO_FINAL_TX_DLY_UUS * UUS_TO_DWT_TIME)) >> 8;
-//
-//	uwb_node.ranging_values.final_tx_ts = (((uint64)(final_tx_time & 0xFFFFFFFEUL)) << 8) + uwb_node.device->antDelay; //时间戳
-//
-//	packFinal(uwb_node.txBuffer);
-//	//send
-//	UWB_SEND_RANGING_FINAL(uwb_node.txBuffer, final_tx_time);
-//
-//}
-//
-//
-//
-//
-////ThisMsg is no need anymore
-//static void packAck(uint8* pbuffer){
-//
-//}
 
 
 

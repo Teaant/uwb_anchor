@@ -14,7 +14,7 @@
 #if(RANGING_ROLE == TAG)
 
 //MICRO_TB_NUM
-#define COMPARE_OFFSET	4
+#define COMPARE_OFFSET	(5)
 
 static uint8_t current_micro_slot = 0;
 
@@ -30,7 +30,12 @@ static SuperFrame_t superframe= {0, };
 extern UWB_Node_t uwb_node;
 extern Timer_t my_timer;
 
-static  uint32_t timer_tick;
+extern volatile uint8_t record_ts;
+
+#if(Tanya_Test)
+uint32_t poll_tick, resp_timeout_tick, final_tick, beacon_tick;
+#endif
+
 
 __weak void uwb_handle_func2(uint16_t  id){
 
@@ -101,12 +106,12 @@ static void remove_anchor_from_table(uint16_t id){
 
 
 void initTag(void){
-
 	uwb_node.state = outside;
 	uwb_node.sub_state = idle;
 	UWB_ENABLE_RX(&uwb_node.device->ports[0]);  //开启接收
 }
 
+//其实完全也是可以放在main当中的？
 void tag_parse_ranging(uint16_t now_slot) {
 
 	UWB_Msg_Header_t *pheader = (UWB_Msg_Header_t*) uwb_node.rxBuffer; //接收数据包的第一个字节当前
@@ -123,17 +128,19 @@ void tag_parse_ranging(uint16_t now_slot) {
 		return ;  //不过如果开启了帧过滤的话就不必了
 	switch (frame_type) {
 	case beacon_frame:
+		beacon_tick = my_timer.htim->Instance->CNT;
 		UWB_Beacon_Payload_t *pbeacon = (UWB_Beacon_Payload_t*) ppayload;
 		if(uwb_node.state == outside){
 			//同步
-			current_micro_slot = 0;
 			Reset_Timer();  //复位计数器
+			current_micro_slot = 0;
 			superframe.cfp_macro_slot_num = pbeacon->CFP_num;
 			superframe.anchor_id = uwb_node.header.src;
 			superframe.pan_id = uwb_node.header.pan_id;
 			superframe.cap_macro_slot_num = pbeacon->CAP_num;
 			enqueueTask(prepare_join, uwb_node.header.src);
 		}else{
+			//怎么不进入到此处了么？
 			enqueueTask(uwb_handle_beacon, uwb_node.header.src);
 		}
 		break;
@@ -145,7 +152,7 @@ void tag_parse_ranging(uint16_t now_slot) {
 			/**
 			* 停止超时定时器
 			*/
-			DISABLE_COMP(my_timer.htim);
+			DISABLE_COMP2(my_timer.htim);
 			enqueueTask(uwb_handle_resp, uwb_node.header.src);
 			break;
 		default:
@@ -162,7 +169,7 @@ void tag_parse_ranging(uint16_t now_slot) {
 			/**
 			* 停止超时定时器
 			*/
-			DISABLE_COMP(my_timer.htim);
+			DISABLE_COMP2(my_timer.htim);
 			enqueueTask(uwb_handle_resp, uwb_node.header.src);
 			UWB_Function2_t * pfun2 = (UWB_Function2_t*) (ppayload + RESP_PAYLOAD_LEN);
 			enqueueTask(uwb_handle_func2, uwb_node.header.src);
@@ -177,7 +184,10 @@ void tag_parse_ranging(uint16_t now_slot) {
 			/**
 			 * @TODO positive ack
 			 */
-			DISABLE_COMP(my_timer.htim);
+			DISABLE_COMP2(my_timer.htim);
+#if(Tanya_Test)
+			uint32_t timer_tick = my_timer.htim->Instance->CNT;   //  2584 - 2558 =
+#endif
 			uwb_node.state = member;
 			enqueueTask(valid_anchor, uwb_node.header.src);
 		}
@@ -207,10 +217,11 @@ void uwb_handle_beacon(uint16_t id){
 	uint16_t * pTags = pbeacon->IDs;
 	uint32_t next_comp = 0;
 	uint32_t tick1, tick2, delta;
+	uint16_t sencond_id;
 //	slot_alloc_node_t* panchor;
 	if(ranging_anchor_values.panchor->slot_alloc.node_id == id){
 		//复位
-		Reset_Timer();  //复位计数器   //话说这个复位有成功吗？
+		Reset_Timer();  //复位计数器
 		current_micro_slot = 0;
 //		ranging_anchor_values.panchor->slot_alloc.absence = 0; //连续几次没有收到锚节点消息   现在不需要这个了，因为有超时接收定时器
 		for(int i = 0; i< pbeacon->CFP_num ; i++){
@@ -221,14 +232,10 @@ void uwb_handle_beacon(uint16_t id){
 				ranging_anchor_values.panchor->slot_alloc.micro1 = GET_MICRO_SLOT1(i+1);  //这个是不是要很长的时间啊？ 我看看哈
 				ranging_anchor_values.panchor->slot_alloc.micro2 = GET_MICRO_SLOT2(i+1);
 				ranging_anchor_values.panchor->slot_alloc.micro3 = GET_MICRO_SLOT3(i+1);
-				next_comp = MICRO_TB_NUM * ranging_anchor_values.panchor->slot_alloc.micro1 - COMPARE_OFFSET;
 				prepare_poll(ranging_anchor_values.panchor->slot_alloc.node_id);
-				Tag_Set_Compare(next_comp, poll_ranging);
-				tick2 = my_timer.htim->Instance->CNT;
 				return;
 			}
 		}
-		//不在其中 ?
 		ranging_anchor_values.panchor->slot_alloc.miss ++;
 		if(ranging_anchor_values.panchor->slot_alloc.miss > uwb_node.interval + 1){
 			//outside了
@@ -237,6 +244,10 @@ void uwb_handle_beacon(uint16_t id){
 			ranging_anchor_values.panchor->slot_alloc.absence = 0;
 			ranging_anchor_values.panchor->slot_alloc.miss = 0;
 			ranging_anchor_values.panchor->slot_alloc.is_valid = 0;
+			ranging_anchor_values.panchor->slot_alloc.macro = 0;
+			ranging_anchor_values.panchor->slot_alloc.micro1 = 1;
+			ranging_anchor_values.panchor->slot_alloc.micro2 = 0;
+			ranging_anchor_values.panchor->slot_alloc.micro3 = 0;
 		}
 		UWB_ENABLE_RX(&uwb_node.device->ports[0]);
 	}else{
@@ -258,17 +269,18 @@ void uwb_handle_resp(uint16_t id){
 	ranging_anchor_values.resp_rx_ts = get_rx_timestamp_u64(&(uwb_node.device->ports[0]));
 	/* Compute final message transmission time. See NOTE 10 below. */
 	final_tx_time = (ranging_anchor_values.resp_rx_ts + (RESP_RX_TO_FINAL_TX_DLY_UUS * UUS_TO_DWT_TIME)) >> 8;
-
+#if(Tanya_Test)
+	uint32_t timer_tick = my_timer.htim->Instance->CNT;
+#endif
+	//好准哎
 	ranging_anchor_values.final_tx_ts = (((uint64)(final_tx_time & 0xFFFFFFFEUL)) << 8) + uwb_node.device->antDelay; //时间戳
 
 	packFinal(uwb_node.txBuffer);
 	//send
 	UWB_SEND_RANGING_FINAL(uwb_node.txBuffer, final_tx_time);
-	uwb_node.sub_state = finaling;
-	//根本不需要再关心后续的内容了，没有了 ~
-	//进入“休眠” idle，等待下一次的定位
-	Tag_Set_GotoSleep(uwb_node.interval * SUPERFRAME_TB_NUM - 5);
-
+	uwb_node.sub_state = finaling;    //为什么不进入睡眠？
+	record_ts = 1;
+	//进入睡眠
 
 }
 
@@ -286,9 +298,8 @@ void tag_wakeup_radio(void){
 
 	UWB_ENABLE_RX(&uwb_node.device->ports[0]);
 	uwb_node.sub_state = listening;
-	ranging_anchor_values.panchor->slot_alloc.miss = 0;  //但是没有哪里还设置了什么啊？
-	//重置时间
-	Reset_Timer();
+	ranging_anchor_values.panchor->slot_alloc.miss = 0;
+//  我还没有设置这个
 }
 
 /**
@@ -308,36 +319,12 @@ void valid_anchor(uint16_t id){
 
 	uwb_node.sub_state = listening;
 	ranging_anchor_values.panchor = panchor;
-	//Tag_Set_Compare(SUPERFRAME_TB_NUM + MICRO_TB_NUM - COMPARE_OFFSET, beacon_timeout_cb);
 	//开启接收
 	UWB_ENABLE_RX(&uwb_node.device->ports[0]);
 	//设置beacon监听超时
 	Tag_Start_Monitor();
 
 }
-
-//暂时是不需要了，使用TIM2的CCR4代替
-//void beacon_timeout_cb(void){
-//
-//	ranging_anchor_values.panchor->slot_alloc.absence ++;
-//	if(ranging_anchor_values.panchor->slot_alloc.absence > 5){
-//		//移除
-//		remove_anchor_from_table(ranging_anchor_values.panchor->slot_alloc.node_id);
-//		//状态切换
-//		uwb_node.state = outside;
-//		uwb_node.sub_state = idle;
-//		//开启接收
-//		UWB_ENABLE_RX(&uwb_node.device->ports[0]);
-//	}else{
-//		/**
-//		 * @TODO 也许可以设置一下休眠之类的，其实这个时候应该还是处于接收状态  设置了帧过滤其实还好的
-//		 */
-//		Tag_Set_Waiting( SUPERFRAME_TB_NUM , resp_timeout_cb);
-//	}
-//
-//}
-
-
 /**
 * @TODO   done
 * 1. new an anchor item
@@ -346,10 +333,10 @@ void valid_anchor(uint16_t id){
 void prepare_join(uint16_t id){
 
 	//根据自己的ID选择一个ALOHA时隙发送请求
-	uint8_t random_slot = uwb_node.id % superframe.cap_macro_slot_num;
+	uint8_t random_slot = uwb_node.id % superframe.cap_macro_slot_num;    // 59
 	//为什么好像是要花很长时间
 	uint8_t groups = superframe.cfp_macro_slot_num/3 +((superframe.cfp_macro_slot_num%3 !=0)?1:0);
-	uint32_t next_compare = MICRO_TB_NUM * (1 + groups * 9 + random_slot *2) - COMPARE_OFFSET;  //2858
+	uint32_t next_compare = MICRO_TB_NUM * (1 + groups * 9 + random_slot *2) - COMPARE_OFFSET;  //2558
 	applying_anchor = id;
 	hear_an_anchor(id, superframe.pan_id);
 	UWB_Mac_Frame_t* joing_msg = (UWB_Mac_Frame_t*)uwb_node.txBuffer;
@@ -368,20 +355,25 @@ void prepare_join(uint16_t id){
 
 //callback 1
 void join_request(void){
+#if(Tanya_Test)
+	uint32_t timer_tick = my_timer.htim->Instance->CNT;  //正确的~
+#endif
 	uwb_node.sub_state = applying;
-	Tag_Set_Waiting(2 * MICRO_TB_NUM, join_timeout_cb);
-	UWB_StartTx(1); //expect
+	Tag_Set_Waiting( 2 * MICRO_TB_NUM, join_timeout_cb);
+	UWB_StartTx(1); //expect   看在此处是什么时候产生请求的，再到那边看下是什么时候收到请求的 ~
 }
 
 /**
- *
  */
 void prepare_poll(uint16_t id){
 
 	packPoll(uwb_node.txBuffer);
 	UWB_Write_Tx_Buffer(uwb_node.txBuffer, POLL_MSG_LEN);
-	timer_tick = my_timer.htim->Instance->CNT;
+#if(Tanya_Test)
+	uint32_t timer_tick = my_timer.htim->Instance->CNT;
+#endif
 	uwb_node.sub_state = ready_ranging;
+	Tag_Set_Compare(MICRO_TB_NUM * ranging_anchor_values.panchor->slot_alloc.micro1 - COMPARE_OFFSET, poll_ranging);
 
 }
 
@@ -393,7 +385,10 @@ void prepare_poll(uint16_t id){
 void poll_ranging(void){
 
 	UWB_StartTx(1); //expect
-	uwb_node.sub_state = polling;   //是不是都很难成功到此处？
+#if(Tanya_Test)
+	poll_tick = my_timer.htim->Instance->CNT;   //？
+#endif
+	uwb_node.sub_state = polling;
 	Tag_Set_Waiting(4 * MICRO_TB_NUM, resp_timeout_cb);
 
 }
@@ -414,14 +409,23 @@ void join_timeout_cb(void){
 void resp_timeout_cb(void){
 	//shouldn't but maybe   why is it?
 	//go to sleep
-	UWB_DISABLE_RX(&uwb_node.device->ports[0]);  //等待下一次唤醒
-	uwb_node.sub_state = sleeping;  //处于睡眠状态 另一个定时器已经设置了
+#if(Tanya_Test)
+	resp_timeout_tick = my_timer.htim->Instance->CNT;   // 2为什么会是2啊？
+#endif
+	//我知道了，是我没有收到resp！
+	UWB_DISABLE_RX(&uwb_node.device->ports[0]);  //关闭接收然后进入sleep
+	//等待下一次唤醒，这边如果没有收到resp，就会进入idle状态
+	//所以2ms根本可能就是时间太短了？
+	Tag_Set_GotoSleep(uwb_node.interval * SUPERFRAME_TB_NUM - 10 * MICRO_TB_NUM);
+	//这边没有进入休眠，而且也没有重新监听，所以只能一直等待 lose_anchor ！
+	uwb_node.sub_state = sleeping;
 
 }
 
 
 void Tag_lose_anchor(){
 	//移除
+
 	remove_anchor_from_table(ranging_anchor_values.panchor->slot_alloc.node_id);
 	//状态切换
 	uwb_node.state = outside;
@@ -437,7 +441,6 @@ void Tag_lose_anchor(){
  */
 static void packPoll(uint8_t* pbuffer){
 
-
 	UWB_Data_Frame_t* poll_msg = (UWB_Data_Frame_t*)pbuffer;
 	poll_msg->header.control = POLL_CONTROL;
 	poll_msg->header.sequence = uwb_node.sequence;
@@ -452,9 +455,9 @@ static void packFinal(uint8* pbuffer){
 
 	UWB_Data_Frame_t* final_msg = (UWB_Data_Frame_t*)pbuffer;
 	final_msg->header.control = FINAL_CONTROL;
-	final_msg->header.sequence = uwb_node.sequence;   //自己
+	final_msg->header.sequence = uwb_node.sequence ++ ;   //自己
 	final_msg->header.pan_id = ranging_anchor_values.panchor->slot_alloc.pan_id;
-	final_msg->header.dist = ranging_anchor_values.panchor->slot_alloc.pan_id;
+	final_msg->header.dist = ranging_anchor_values.panchor->slot_alloc.node_id;
 	final_msg->header.src = uwb_node.id;
 	final_msg->payload1.function = UWB_Ranging_Final;
 	final_msg->payload1.final_payload.poll_tx_ts = ranging_anchor_values.poll_tx_ts;

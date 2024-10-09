@@ -45,26 +45,19 @@ volatile uint8_t tx_state = Buffer_ready;
 extern UWB_Node_t uwb_node;
 extern Timer_t my_timer;
 
+#if(RANGING_ROLE ==TAG)
+volatile uint8_t record_ts = 0;
+#endif
+
 /**
  * @TODO  当前锚节点？ 标签节点？
  */
-//UWB add
-extern AgentTypeDef agent;
-extern AgentTypeDef leader_agent;
-extern AgentTypeDef *p_current_agent;
-
 
 extern SPI_HandleTypeDef hspi1;
 extern SPI_HandleTypeDef hspi2;
 extern SPI_HandleTypeDef hspi3;
 extern SPI_HandleTypeDef hspi4;
 extern SPI_HandleTypeDef hspi6;
-
-
-extern TIM_HandleTypeDef htim7;
-extern TIM_HandleTypeDef htim6;
-
-
 
 
 /**
@@ -78,14 +71,6 @@ int32_t uwbInit(uint16_t ID, uint8_t role)
 			.PGdly = 0xC0,
 			.power = 0x851F1F85
 	};
-
-	/**
-	 *  void MX_SPI1_Init(void);
-		void MX_SPI2_Init(void);
-		void MX_SPI3_Init(void);
-		void MX_SPI4_Init(void);
-		void MX_SPI6_Init(void);
-	 */
 
 	//标签节点只使用一个
     UWB.ports[0].hspi = &hspi6;
@@ -314,11 +299,20 @@ void txOkCallback(const dwt_cb_data_t *cbData, UWBPortTypeDef *pports){
 #if(Tanya_Test)
 	tx_timer_tick = my_timer.htim->Instance->CNT;
 #endif
+#if(RANGING_ROLE == ANCHOR)
 	tx_state = Buffer_ready;
 	if(txDoneCallback != NULL){
 		txDoneCallback();
 		txDoneCallback = NULL;
 	}
+#else
+	if(record_ts == 1){
+		Tag_Set_GotoSleep(uwb_node.interval * SUPERFRAME_TB_NUM - 10 * MICRO_TB_NUM);
+		uwb_node.sub_state = sleeping;  //对吼 ~
+		record_ts = 0;
+	}
+#endif
+
 }
 
 void rxErrCallback(const dwt_cb_data_t *cbData, UWBPortTypeDef *pports)

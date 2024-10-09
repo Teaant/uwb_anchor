@@ -9,6 +9,7 @@
 #define DEVICES_INC_UWB_MAC_TAG_H_
 
 #include "main.h"
+#include "uwb_mac.h"
 
 void initTag(void);
 
@@ -25,6 +26,8 @@ void uwb_handle_func2(uint16_t id);
 void uwb_handle_beacon(uint16_t id);
 void uwb_handle_resp(uint16_t id);
 void uwb_handle_mac(uint16_t id);
+
+
 
 
 // outside

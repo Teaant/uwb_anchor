@@ -29,12 +29,9 @@
 # define DEFAULT_ANT_DELAY 16451
 /* UWB microsecond (uus) to device time unit (dtu, around 15.65 ps) conversion factor.
  * 1 uus = 512 / 499.2 �s and 1 �s = 499.2 * 128 dtu. */
-#define UUS_TO_DWT_TIME 65536   //  63898   us -> 转化成DW1000的1us的时间更加精确点似乎是  1us * 499.2e6*128 =
-								//天线延迟？能否精确，是什么？从什么时候开始计算的？
-
+#define UUS_TO_DWT_TIME 63898   //  63898   us -> 转化成DW1000的1us的时间更加精确点似乎是  1us * 499.2e6*128 =
 //发送后进入接收的
 #define POLL_TX_TO_RESP_RX_DLY_UUS	0
-
 
 /* Receive final timeout. See NOTE 5 below. */
 #define FINAL_RX_TIMEOUT_UUS 0      //2000*(UWB_REPLY_INTERVAL+1)
@@ -45,7 +42,7 @@
  * 时间
  */
 #define POLL_RX_TO_RESP_TX_DLY_UUS  (MICRO_SLOT_US*UWB_REPLY_INTERVAL)    	//3000 这个是us单位
-#define RESP_RX_TO_FINAL_TX_DLY_UUS (MICRO_SLOT_US*UWB_REPLY_INTERVAL)
+#define RESP_RX_TO_FINAL_TX_DLY_UUS (6000)   //in us
 #define FINAL_RX_TO_ACK_TX_DLY_UUS 	(MICRO_SLOT_US*UWB_REPLY_INTERVAL)
 
 /* Preamble timeout, in multiple of PAC size. See NOTE 6 below. */
@@ -54,11 +51,8 @@
 /* Speed of light in air, in metres per second. */
 #define SPEED_OF_LIGHT 299702547
 
-
 #define RXPACC_ADJUSTMENT (-18) //adjustment for decawave PRF length 16
 #define A_PRF64M (121.74f)
-
-
 
 
 #endif /* DEVICES_INC_UWB_CONSTS_H_ */

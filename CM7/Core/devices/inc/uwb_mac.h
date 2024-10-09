@@ -13,12 +13,14 @@
 #include "uwb_msg.h"
 #include "uwb_consts.h"
 
-//定义角色
-#define  	RANGING_ROLE    	ANCHOR
 #define 	Tanya_Test			1
+//定义角色
+#define  	RANGING_ROLE    	TAG
+
 
 #if(RANGING_ROLE == TAG)
 #define 	MY_ID				0xBBBB
+#define TAG_INTERVAL			5
 #else
 #define 	MY_ID				0xAAAA
 #endif
@@ -33,14 +35,12 @@
 /**
  * k = ((macro-1)/3)*(3 * 3) +(macro-1)%3+1;
    printf("宏时隙：%d, 微时隙：%d, %d, %d, %d\n", macro, k, k+3, k+6, k+9);
- *
  */
 #define DS_TWR_TIMES			3
 #define GET_MICRO_SLOT1(macro)  ((((macro)-1)/UWB_REPLY_INTERVAL)*(UWB_REPLY_INTERVAL*DS_TWR_TIMES) +((macro)-1)%UWB_REPLY_INTERVAL+1)
 #define GET_MICRO_SLOT2(macro)  ((GET_MICRO_SLOT1(macro))+UWB_REPLY_INTERVAL)
 #define GET_MICRO_SLOT3(macro)  ((GET_MICRO_SLOT1(macro))+UWB_REPLY_INTERVAL*2)
 //#define GET_MICRO_SLOT4(macro)  ((GET_MICRO_SLOT1(macro))+UWB_REPLY_INTERVAL*3)
-
 
 #define  PDoA_RX_Buffer  UWB_Msg_Header_t
 
@@ -53,14 +53,38 @@
 /**
  * void UWB_Send(uint8_t * pdata, uint8_t len, If_Delay_t is_delayed, uint32_t tx_time, If_Expected_t is_expect)
  */
-#define UWB_SEND_RANGING_POLL(pdata)				UWB_Send(pdata, POLL_MSG_LEN, 0, 0, 1)
-#define UWB_SEND_RANGING_RESP(pdata, tx_time)		UWB_Send(pdata, RESP_MSG_LEN, 1, tx_time, 1)
-#define UWB_SEND_RANGING_FINAL(pdata, tx_time)		UWB_Send(pdata, FINAL_MSG_LEN, 1, tx_time, 0)
-#define UWB_SEND_RANGING_ACK(pdata, tx_time)		UWB_Send(pdata, ACK_MSG_LEN, 1, tx_time, 0)
+#define UWB_SEND_RANGING_POLL(pdata)				UWB_Send(pdata, POLL_MSG_LEN, 0, 0, 1)  //no use
+#define UWB_SEND_RANGING_RESP(pdata, tx_time)		UWB_Send(pdata, RESP_MSG_LEN, 1, tx_time, 1)   //no use
+#define UWB_SEND_RANGING_FINAL(pdata, tx_time)		UWB_Send(pdata, FINAL_MSG_LEN, 1, tx_time, 0)  //use in tag
+#define UWB_SEND_JOIN_REQ(pdata)					UWB_Send(pdata, JOIN_REQ_MSG_LEN, 0, 0, 1)   //no use
 
-#define UWB_SEND_JOIN_REQ(pdata)					UWB_Send(pdata, JOIN_REQ_MSG_LEN, 0, 0, 1)
+//标签节点出现了ENABLE_COMP调用之后马上就进入了中断，所以在此处我把中断标志先清除了然后再使能，之后就没再出现了
+#define ENABLE_COMP1(htim)		__HAL_TIM_CLEAR_FLAG(htim, TIM_FLAG_CC1);\
+								__HAL_TIM_ENABLE_IT(htim, TIM_IT_CC1)
 
-//anchor的main函数中遍历slot_alloc_table,准备好Beacon帧
+#define DISABLE_COMP1(htim)		__HAL_TIM_DISABLE_IT(htim, TIM_IT_CC1)
+
+#define ENABLE_COMP2(htim)		__HAL_TIM_CLEAR_FLAG(htim, TIM_FLAG_CC2);\
+								__HAL_TIM_ENABLE_IT(htim, TIM_IT_CC2)
+
+#define DISABLE_COMP2(htim)		__HAL_TIM_DISABLE_IT(htim, TIM_IT_CC2)
+
+
+#define ENABLE_COMP3(htim)		__HAL_TIM_CLEAR_FLAG(htim, TIM_FLAG_CC3);\
+								__HAL_TIM_ENABLE_IT(htim, TIM_IT_CC3)
+
+#define DISABLE_COMP3(htim)		__HAL_TIM_DISABLE_IT(htim, TIM_IT_CC3)
+
+
+#define ENABLE_COMP4(htim)		__HAL_TIM_CLEAR_FLAG(htim, TIM_FLAG_CC4);\
+								__HAL_TIM_ENABLE_IT(htim, TIM_IT_CC4)
+
+#define DISABLE_COMP4(htim)		__HAL_TIM_DISABLE_IT(htim, TIM_IT_CC4)
+
+
+typedef void (*compare_callback)(void);    		//定时器比较回调函数  Anchor和Tag都使用  Anchor CH1, Tag CH2
+typedef void (*anchor_tag_callback)(uint8_t);  	//对应标签节点的三个Timer比较输出通道，CH2， CH3， CH4
+
 
 typedef struct{
 	uint16_t node_id;
@@ -71,15 +95,10 @@ typedef struct{
 	uint16_t micro1;		//微时隙1
 	uint16_t micro2;
 	uint16_t micro3;
-//	uint16_t micro4;
 	uint8_t  interval;  	//定位周期
 	uint8_t  time_to_locate;   //-1  every superframe  锚节点遍历该值确定是否测距标签节点
 	uint8_t absence;		//缺席次数
 	uint8_t miss;
-//#if(RANGING_ROLE == ANCHOR)  //共享内存？
-//	float distance;
-//#endif
-
 }Slot_Alloc_t;
 
 typedef struct Slot_Item{
@@ -104,15 +123,12 @@ typedef struct{
 	uint64 poll_rx_ts;
 	uint64 resp_tx_ts;
 	uint64 final_rx_ts;
-	int64 tof_dtu;
-	int64 R1, R2, D1, D2;   //其实也没什么必要弄这个，要是有的话到时候再说了，就这样吧先
+	int64 R1, R2, D1, D2;
 	float distance;
-	//其实只要修改一下id和sequence就行了，那直接用一个完全是足够的
 	/**
 	 * @TODO:锚节点增加角度相关记录？
 	 */
 #endif
-
 }UWB_RangingValue_t;
 
 
@@ -144,7 +160,6 @@ typedef struct{
 	uint8_t my_macro_slot; //当前我的宏时隙号
 	uint8_t cfp_macro_slot_num;       //当前超帧tag节点的总数  tag_now * 9 +1  CAP开始微时隙号
 	uint8_t cap_macro_slot_num;
-	uint8_t my_micro_slots[3];
 }SuperFrame_t;
 
 //或许需要维护一个beacon帧的内容
@@ -160,7 +175,6 @@ typedef struct{
 	UWBDef* device;
 	//sequence  only 1 octet
 	uint8_t sequence;
-//	slot_alloc_node_t*  pslot_alloc_table;
 
 	UWB_Msg_Header_t header;
 #if(RANGING_ROLE == ANCHOR)
@@ -187,34 +201,6 @@ typedef struct{
 最多可以容纳 这么多节点    249 / 4 = 62
  */
 //24 * 4ms = 96ms
-
-//标签节点出现了ENABLE_COMP调用之后马上就进入了中断，所以在此处我把中断标志先清除了然后再使能，之后就没再出现了
-#define ENABLE_COMP1(htim)		__HAL_TIM_CLEAR_FLAG(htim, TIM_FLAG_CC1);\
-								__HAL_TIM_ENABLE_IT(htim, TIM_IT_CC1)
-
-#define DISABLE_COMP1(htim)		__HAL_TIM_DISABLE_IT(htim, TIM_IT_CC1)
-
-#define ENABLE_COMP(htim)		__HAL_TIM_CLEAR_FLAG(htim, TIM_FLAG_CC2);\
-								__HAL_TIM_ENABLE_IT(htim, TIM_IT_CC2)
-
-#define DISABLE_COMP(htim)		__HAL_TIM_DISABLE_IT(htim, TIM_IT_CC2)
-
-
-#define ENABLE_COMP3(htim)		__HAL_TIM_CLEAR_FLAG(htim, TIM_FLAG_CC3);\
-								__HAL_TIM_ENABLE_IT(htim, TIM_IT_CC3)
-
-#define DISABLE_COMP3(htim)		__HAL_TIM_DISABLE_IT(htim, TIM_IT_CC3)
-
-
-#define ENABLE_COMP4(htim)		__HAL_TIM_CLEAR_FLAG(htim, TIM_FLAG_CC4);\
-								__HAL_TIM_ENABLE_IT(htim, TIM_IT_CC4)
-
-#define DISABLE_COMP4(htim)		__HAL_TIM_DISABLE_IT(htim, TIM_IT_CC4)
-
-
-typedef void (*compare_callback)(void);
-
-typedef void (*anchor_tag_callback)(uint8_t);
 
 
 typedef struct{

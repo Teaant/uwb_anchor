@@ -17,6 +17,7 @@
 #ifndef __UWB_H_
 #define __UWB_H_
 
+typedef void(*txDoneCb)(void);
 
 typedef enum{
 	Buffer_ready = 0,
@@ -35,7 +36,7 @@ typedef struct
 
 int32_t uwbInit(uint16_t ID, uint8_t role);
 
-void setTxDoneCallback(txDoneCallback callback);
+void setTxDoneCallback(txDoneCb callback);
 //Tanya_add
 void rxOkCallback_Ranging(const dwt_cb_data_t *cbData, UWBPortTypeDef *pports);
 //TX ok callback

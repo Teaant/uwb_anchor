@@ -30,12 +30,15 @@ static dwt_config_t config = {
 /* Declaration of static functions. */
 
 //static float uwb_get_fp_angle(uint16_t, UWBPortTypeDef *);
-
+volatile uint32_t tx_timer_tick;
+volatile uint32_t rx_timer_tick;
 
 UWBDef UWB={
 		.err_time = 0,
 		.antDelay = RX_ANT_DLY
 };
+
+txDoneCb txDoneCallback = NULL;
 
 volatile uint8_t tx_state = Buffer_ready;
 
@@ -60,6 +63,8 @@ extern SPI_HandleTypeDef hspi6;
 
 extern TIM_HandleTypeDef htim7;
 extern TIM_HandleTypeDef htim6;
+
+
 
 
 /**
@@ -184,7 +189,7 @@ int32_t uwbInit(uint16_t ID, uint8_t role)
 		}
 #if(RANGING_ROLE == ANCHOR)
 		else{
-			dwt_setcallbacks(txOkCallback, rxOkCallback_PDoA, rxToCallback, rxErrCallback);  //不同的使用不同的这个callback呢？
+			dwt_setcallbacks(NULL, rxOkCallback_PDoA, rxToCallback, rxErrCallback);  //不同的使用不同的这个callback呢？
 		}
 #endif
 
@@ -214,9 +219,8 @@ int32_t uwbInit(uint16_t ID, uint8_t role)
     return 0;
 }
 
-void setTxDoneCallback(txDoneCallback callback){
-	dwt_setlocaldataptr(0);
-	dwt_setTdcallbacks(callback);
+void setTxDoneCallback(txDoneCb callback){
+	txDoneCallback = callback;
 }
 
 
@@ -260,9 +264,11 @@ uint64 get_rx_timestamp_u64(UWBPortTypeDef *pports)
 
 void rxOkCallback_Ranging(const dwt_cb_data_t *cbData, UWBPortTypeDef *pports){
 
-	uint32_t tick = my_timer.htim->Instance->CNT;
+#if(Tanya_Test)
+	rx_timer_tick = my_timer.htim->Instance->CNT;
+#endif
 
-	uint16_t now_slot = tick/MICRO_TB_NUM;
+	uint16_t now_slot = rx_timer_tick/MICRO_TB_NUM;
 
 	uint8_t * pdata = uwb_node.rxBuffer;
 	dwt_readrxdata(pdata, cbData->datalength, 0,pports);
@@ -271,10 +277,7 @@ void rxOkCallback_Ranging(const dwt_cb_data_t *cbData, UWBPortTypeDef *pports){
 	tag_parse_ranging(now_slot);
 #else
 	anchor_parse_ranging(now_slot);
-//	UWB_ENABLE_RX(pports);   //如果是锚节点就大部分事件还是保持在接收的状态 ~   //所以每一次的发送之前都需要先关闭
 #endif
-//	UWB_ENABLE_RX(pports);   //如果是锚节点就大部分事件还是保持在接收的状态 ~
-
 
 }
 
@@ -308,7 +311,14 @@ void rxToCallback(const dwt_cb_data_t *cbData, UWBPortTypeDef *pports)
 }
 
 void txOkCallback(const dwt_cb_data_t *cbData, UWBPortTypeDef *pports){
+#if(Tanya_Test)
+	tx_timer_tick = my_timer.htim->Instance->CNT;
+#endif
 	tx_state = Buffer_ready;
+	if(txDoneCallback != NULL){
+		txDoneCallback();
+		txDoneCallback = NULL;
+	}
 }
 
 void rxErrCallback(const dwt_cb_data_t *cbData, UWBPortTypeDef *pports)
@@ -343,7 +353,7 @@ void UWB_StartTx(uint8_t is_expect){
 
 	UWBPortTypeDef *pports = &(uwb_node.device->ports[0]);
 	//决定是否会在发送后开启接收
-	if(is_expect){
+	if(is_expect == 1){
 		dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED, pports);
 	}else{
 		dwt_starttx(DWT_START_TX_IMMEDIATE , pports);

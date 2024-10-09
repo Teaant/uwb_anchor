@@ -2323,10 +2323,7 @@ void dwt_setcallbacks(dwt_cb_t cbTxDone, dwt_cb_t cbRxOk, dwt_cb_t cbRxTo, dwt_c
 /**
  *
  */
-//Tanya_add
-void dwt_setTdcallbacks(txDoneCallback cbTxDone){
-	pdw1000local->myTxDone = cbTxDone;
-}
+
 
 /*! ------------------------------------------------------------------------------------------------------------------
  * @fn dwt_checkirq()
@@ -2447,10 +2444,8 @@ void dwt_isr(UWBPortTypeDef *pports)
         if(pdw1000local->cbTxDone != NULL)
         {
             pdw1000local->cbTxDone(&pdw1000local->cbData, pports);
-        }// my，记住之后要null掉
-        if(pdw1000local->myTxDone != NULL){
-        	pdw1000local->myTxDone();
         }
+
     }
 
     // Handle frame reception/preamble detect timeout events
@@ -2483,7 +2478,7 @@ void dwt_isr(UWBPortTypeDef *pports)
         // Because of an issue with receiver restart after error conditions, an RX reset must be applied after any error or timeout event to ensure
         // the next good frame's timestamp is computed correctly.
         // See section "RX Message timestamp" in DW1000 User Manual.
-//        dwt_forcetrxoff();
+        dwt_forcetrxoff(pports);
         dwt_rxreset(pports);
 
         // Call the corresponding callback if present

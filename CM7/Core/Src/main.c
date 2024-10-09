@@ -64,7 +64,6 @@
 
 /* Private variables ---------------------------------------------------------*/
 
-
 /* USER CODE BEGIN PV */
 
 
@@ -200,14 +199,14 @@ int main(void)
  		{
  		    /* Set expected response's delay and timeout. See NOTE 4, 5 and 6 below.
  		     * As this example only handles one incoming frame with always the same delay and timeout, those values can be set here once for all. */
-// 			dwt_setrxaftertxdelay(0, pports);  //若是不设置呢，我希望在代码中设置的，若是不进入rx我希�?
+// 			dwt_setrxaftertxdelay(0, pports);  //若是不设置呢，我希望在代码中设置的，若是不进入rx我希�??
  			dwt_setrxtimeout(0, &uwb_node.device->ports[i]);
  			HAL_NVIC_ClearPendingIRQ(uwb_node.device->ports[i].exti_line);
  			HAL_NVIC_EnableIRQ(uwb_node.device->ports[i].exti_line);
  		}
  	}
 
-// 	HAL_GPIO_WritePin(GPIOE, GPIO_PIN_9, GPIO_PIN_SET);  //This is to do what，  to synchronize the PDoA board
+// 	HAL_GPIO_WritePin(GPIOE, GPIO_PIN_9, GPIO_PIN_SET);  //This is to do what�?  to synchronize the PDoA board
 
   /* USER CODE END 2 */
 
@@ -359,7 +358,7 @@ void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim){
 		Tag_lose_anchor();
 	}
 #else
-	//大多数的时候锚节点都是处于接收状态的哈啊
+
 	if(htim->Channel == HAL_TIM_ACTIVE_CHANNEL_1){
 		if(my_timer.callback){
 			HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
@@ -406,7 +405,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
   /* USER CODE BEGIN Callback 1 */
 //  if (htim->Instance == TIM2) {
 ////	  Inc_Uwb_Tick();
-//	  //�?????????要restart?
+//	  //�??????????要restart?
 //
 //	  //zaiguancha
 //   }

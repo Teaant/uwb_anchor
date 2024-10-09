@@ -228,7 +228,6 @@ typedef struct
 // Call-back type for all events
 typedef void (*dwt_cb_t)(const dwt_cb_data_t *, UWBPortTypeDef *);
 
-typedef void (*txDoneCallback)(void);
 
 /*! ------------------------------------------------------------------------------------------------------------------
  * Structure typedef: dwt_config_t
@@ -321,8 +320,7 @@ typedef struct
     uint16      otp_mask ;          // Local copy of the OTP mask used in dwt_initialise call
     dwt_cb_data_t cbData;           // Callback data structure
     dwt_cb_t    cbTxDone;           // Callback for TX confirmation event
-    //Tanya_add
-    txDoneCallback myTxDone;
+
     dwt_cb_t    cbRxOk;             // Callback for RX good frame event
     dwt_cb_t    cbRxTo;             // Callback for RX timeout events
     dwt_cb_t    cbRxErr;            // Callback for RX error events
@@ -1184,8 +1182,7 @@ int dwt_spicswakeup(uint8 *buff, uint16 length, UWBPortTypeDef *pports);
  */
 void dwt_setcallbacks(dwt_cb_t cbTxDone, dwt_cb_t cbRxOk, dwt_cb_t cbRxTo, dwt_cb_t cbRxErr);
 
-//Tanyaa_add
-void dwt_setTdcallbacks(txDoneCallback cbTxDone);
+
 /*! ------------------------------------------------------------------------------------------------------------------
  * @fn dwt_checkirq()
  *

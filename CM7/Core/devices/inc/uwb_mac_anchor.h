@@ -25,6 +25,7 @@ void poll_timeout_cb(uint8_t _index);
 
 void resp_issue_cb(uint8_t _index);
 void myTxDoneCb(void);
+void beaconDoneCb(void);
 
 void final_timeout_cb(uint8_t _index);
 

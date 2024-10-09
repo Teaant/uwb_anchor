@@ -27,8 +27,6 @@ void uwb_handle_resp(uint16_t id);
 void uwb_handle_mac(uint16_t id);
 
 
-
-
 // outside
 void prepare_join(uint16_t id);
 void join_request(void);

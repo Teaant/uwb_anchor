@@ -57,13 +57,14 @@ void Reset_Timer(void) {
 	DISABLE_COMP1(my_timer.htim);
 #endif
 	// 停止定时器
-	my_timer.htim->Instance->CR1 &= ~TIM_CR1_CEN;   // 禁用定时器
+	my_timer.htim->Instance->CR1 &= ~TIM_CR1_CEN;   // 停用定时器
 	// 清除计数值
 	my_timer.htim->Instance->CNT = 0;
 //	// (可选) 清除更新标志
 //	TIM2->SR &= ~TIM_SR_UIF;
-	// 重新启动定时器
+	//重新启动定时器
 	my_timer.htim->Instance->CR1 |= TIM_CR1_CEN;    // 启用定时器
+
 }
 
 uint16_t get_now_microSlot(void){

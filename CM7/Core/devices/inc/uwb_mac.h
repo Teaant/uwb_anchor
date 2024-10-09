@@ -24,7 +24,6 @@
 #endif
 #define 	PAN_ID				0x3737
 
-
 #if(RANGING_TAG == ANCHOR)
 #include "uwb_mac_anchor.h"
 #else
@@ -41,7 +40,6 @@
 #define GET_MICRO_SLOT2(macro)  ((GET_MICRO_SLOT1(macro))+UWB_REPLY_INTERVAL)
 #define GET_MICRO_SLOT3(macro)  ((GET_MICRO_SLOT1(macro))+UWB_REPLY_INTERVAL*2)
 //#define GET_MICRO_SLOT4(macro)  ((GET_MICRO_SLOT1(macro))+UWB_REPLY_INTERVAL*3)
-
 
 
 #define  PDoA_RX_Buffer  UWB_Msg_Header_t
@@ -190,23 +188,33 @@ typedef struct{
  */
 //24 * 4ms = 96ms
 
-#define ENABLE_COMP1(htim)		__HAL_TIM_ENABLE_IT(htim, TIM_IT_CC1)
+#define ENABLE_COMP1(htim)		__HAL_TIM_CLEAR_FLAG(htim, TIM_FLAG_CC1);\
+								__HAL_TIM_ENABLE_IT(htim, TIM_IT_CC1)
+
 #define DISABLE_COMP1(htim)		__HAL_TIM_DISABLE_IT(htim, TIM_IT_CC1)
 
-#define ENABLE_COMP(htim)		__HAL_TIM_ENABLE_IT(htim, TIM_IT_CC2)
+#define ENABLE_COMP(htim)		__HAL_TIM_CLEAR_FLAG(htim, TIM_FLAG_CC2);\
+								__HAL_TIM_ENABLE_IT(htim, TIM_IT_CC2)
+
 #define DISABLE_COMP(htim)		__HAL_TIM_DISABLE_IT(htim, TIM_IT_CC2)
 
 
-#define ENABLE_COMP3(htim)		__HAL_TIM_ENABLE_IT(htim, TIM_IT_CC3)
+#define ENABLE_COMP3(htim)		__HAL_TIM_CLEAR_FLAG(htim, TIM_FLAG_CC3);\
+								__HAL_TIM_ENABLE_IT(htim, TIM_IT_CC3)
+
 #define DISABLE_COMP3(htim)		__HAL_TIM_DISABLE_IT(htim, TIM_IT_CC3)
 
-//我发现而且可以不需要每次都设置那个东西，因为只要只要出现了beacon，我就会reset_timer，这样就自动的不会计数到定时的值了
-#define ENABLE_COMP4(htim)		__HAL_TIM_ENABLE_IT(htim, TIM_IT_CC4)
+
+#define ENABLE_COMP4(htim)		__HAL_TIM_CLEAR_FLAG(htim, TIM_FLAG_CC4);\
+								__HAL_TIM_ENABLE_IT(htim, TIM_IT_CC4)
+
 #define DISABLE_COMP4(htim)		__HAL_TIM_DISABLE_IT(htim, TIM_IT_CC4)
+
 
 typedef void (*compare_callback)(void);
 
 typedef void (*anchor_tag_callback)(uint8_t);
+
 
 typedef struct{
 	TIM_HandleTypeDef *htim;

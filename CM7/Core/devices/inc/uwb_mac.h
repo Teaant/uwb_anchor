@@ -15,7 +15,7 @@
 
 #define 	Tanya_Test			1
 //定义角色
-#define  	RANGING_ROLE    	TAG
+#define  	RANGING_ROLE    	ANCHOR
 
 
 #if(RANGING_ROLE == TAG)

@@ -27,7 +27,7 @@ slot_alloc_node_t* memp_alloc(void){
 	int8_t pos = find_free_pos();
 	if(pos >= 0){
 		alloc_mask &= 0x00000001 << pos;
-		node_mem_pool[pos].pnext = NULL;
+//		node_mem_pool[pos].pnext = NULL;
 		return &node_mem_pool[pos];
 	}else {
 		return NULL;
@@ -37,7 +37,7 @@ slot_alloc_node_t* memp_alloc(void){
 void memp_free(slot_alloc_node_t* item){
 
 	uint8_t pos = item - node_mem_pool;
-	node_mem_pool[pos].pnext = NULL;
+	memset((uint8_t*)&node_mem_pool[pos], 0, sizeof(slot_alloc_node_t));
 	alloc_mask &= ~(1<<pos);
 
 }

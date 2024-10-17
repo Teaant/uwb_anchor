@@ -127,8 +127,6 @@ void Error_Handler(void);
 #define UWB2B_RSTn_GPIO_Port GPIOD
 #define LED1_Pin GPIO_PIN_13
 #define LED1_GPIO_Port GPIOD
-#define LED2_Pin GPIO_PIN_14
-#define LED2_GPIO_Port GPIOD
 #define LED3_Pin GPIO_PIN_15
 #define LED3_GPIO_Port GPIOD
 #define UWB3A_RSTn_Pin GPIO_PIN_8

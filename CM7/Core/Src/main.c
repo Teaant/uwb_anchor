@@ -34,6 +34,9 @@
 #include "utilities.h"
 #include "aoa.h"
 
+#include "agent.h"
+#include "corecomm.h"
+
 #if(RANGING_ROLE == ANCHOR)
 #include "uwb_mac_anchor.h"
 #else
@@ -63,6 +66,8 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+volatile holding_reg_params_t holding_data __attribute__((section(".shared"))) = {0,};
+volatile input_reg_params_t   input_data __attribute__((section(".shared"))) = {0,};
 
 /* USER CODE BEGIN PV */
 
@@ -199,14 +204,14 @@ int main(void)
  		{
  		    /* Set expected response's delay and timeout. See NOTE 4, 5 and 6 below.
  		     * As this example only handles one incoming frame with always the same delay and timeout, those values can be set here once for all. */
-// 			dwt_setrxaftertxdelay(0, pports);  //若是不设置呢，我希望在代码中设置的，若是不进入rx我希�??
+// 			dwt_setrxaftertxdelay(0, pports);  //若是不设置呢，我希望在代码中设置的，若是不进入rx我希�???
  			dwt_setrxtimeout(0, &uwb_node.device->ports[i]);
  			HAL_NVIC_ClearPendingIRQ(uwb_node.device->ports[i].exti_line);
  			HAL_NVIC_EnableIRQ(uwb_node.device->ports[i].exti_line);
  		}
  	}
 
-// 	HAL_GPIO_WritePin(GPIOE, GPIO_PIN_9, GPIO_PIN_SET);  //This is to do what�?  to synchronize the PDoA board
+// 	HAL_GPIO_WritePin(GPIOE, GPIO_PIN_9, GPIO_PIN_SET);  //This is to do what�??  to synchronize the PDoA board
 
   /* USER CODE END 2 */
 
@@ -343,7 +348,7 @@ void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim){
 	if (htim->Channel == HAL_TIM_ACTIVE_CHANNEL_3) {
 #if(Tanya_Test_Timer)
 		HAL_GPIO_TogglePin(LED3_GPIO_Port, LED3_Pin);
-		Reset_Timer();   //�?新
+		Reset_Timer();   //�??�?
 		Tag_Set_Compare(40, test_callback);
 #else
 		//休眠
@@ -410,7 +415,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
   /* USER CODE BEGIN Callback 1 */
 //  if (htim->Instance == TIM2) {
 ////	  Inc_Uwb_Tick();
-//	  //�??????????要restart?
+//	  //�???????????要restart?
 //
 //	  //zaiguancha
 //   }

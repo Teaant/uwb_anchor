@@ -70,10 +70,12 @@ void HAL_MspInit(void)
   __HAL_RCC_SYSCFG_CLK_ENABLE();
 
   /* System interrupt init*/
+  /* PendSV_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(PendSV_IRQn, 15, 0);
 
   /* Peripheral interrupt init */
   /* HSEM2_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(HSEM2_IRQn, 5, 0);
+  HAL_NVIC_SetPriority(HSEM2_IRQn, 6, 0);
   HAL_NVIC_EnableIRQ(HSEM2_IRQn);
 
   /* USER CODE BEGIN MspInit 1 */

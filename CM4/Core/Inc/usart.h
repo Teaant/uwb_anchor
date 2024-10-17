@@ -41,7 +41,7 @@ void connect_wifi(void);
 void MX_USART2_UART_Init(void);
 
 /* USER CODE BEGIN Prototypes */
-
+HAL_StatusTypeDef HAL_UART_Receive_DMA_ToIdle(UART_HandleTypeDef *huart, uint8_t *pData, uint16_t Size);
 /* USER CODE END Prototypes */
 
 #ifdef __cplusplus

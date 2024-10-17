@@ -12,6 +12,9 @@
 #include "mem_manager.h"
 #include "task_manager.h"
 
+#include "corecomm.h"
+#include "agent.h"
+
 
 #if(RANGING_ROLE == ANCHOR)
 //所有标签的结果上报给应用层，当前只考虑连续三个标签的情况
@@ -50,6 +53,7 @@ volatile  int8_t waiting_index  = -1;   //hua
 
 volatile uint16_t pdoa_rx = 0;
 
+extern volatile input_reg_params_t   input_data __attribute__((section(".shared")));
 
 /**
  * 一次最多51个节点同时测距  = 3 * 17
@@ -477,6 +481,7 @@ void calculate_distance(uint16_t index){
 	//来自文档(App Note APS013)的神秘公式   神秘公式不神秘 ~
 	tof_dtu = (int64)(((double)ranging_tags_value[index].R1 * (double)ranging_tags_value[index].R2 - (double)ranging_tags_value[index].D1 * (double)ranging_tags_value[index].D2) / ((double)ranging_tags_value[index].R1 + (double)ranging_tags_value[index].R2 + (double)ranging_tags_value[index].D1 + (double)ranging_tags_value[index].D2));
 	ranging_tags_value[index].distance = (float)tof_dtu*DWT_TIME_UNITS*SPEED_OF_LIGHT;
+	ranging_tags_value[index].ptag->slot_alloc.times ++;
 	//Tanya_add  这个的单位是m ？
 	if(ranging_tags_value[index].distance < 0.3)
 	{
@@ -492,10 +497,39 @@ void anchor_parse_pdoa(uint8_t pdoa_id){
 }
 
 //到时候交给另外的去实现也是可以的  清零
+//__weak void Upload_Data(volatile UWB_RangingValue_t* pValues, uint8_t num){
+//	for(int i = 0; i < num ; i++){
+//		memset((uint8_t*)(pValues+i), 0, sizeof(UWB_RangingValue_t));
+//	}
+//}
+
 __weak void Upload_Data(volatile UWB_RangingValue_t* pValues, uint8_t num){
+
+	if(num <= 0) return;
+	uint8_t vailable_num = 0;
+	input_data.my_id = uwb_node.id;
+	input_data.my_pan_id = uwb_node.pan_id;
+
 	for(int i = 0; i < num ; i++){
+		if((pValues+i)->is_available == 1){
+			input_data.nodes_value1[vailable_num].tag_id = (pValues+i)->ptag->slot_alloc.node_id;
+			input_data.nodes_value1[vailable_num].absence  = (pValues+i)->ptag->slot_alloc.absence;
+			input_data.nodes_value1[vailable_num].interval = (pValues+i)->ptag->slot_alloc.interval;
+			input_data.nodes_value1[vailable_num].times = (pValues+i)->ptag->slot_alloc.times;
+			input_data.nodes_value1[vailable_num].distance = (uint16_t)((pValues+i)->distance * 100); //in cm
+			input_data.nodes_value1[vailable_num].angle = 0;
+			vailable_num ++;
+		}
 		memset((uint8_t*)(pValues+i), 0, sizeof(UWB_RangingValue_t));
 	}
+	input_data.available = 1;
+	input_data.node_num = vailable_num;
+	//中断
+	actCM4Interrupt(RANGING_DATA_724_3);
+	genInterrupt(RANGING_DATA_724_3);
+
+
+
 }
 
 #endif

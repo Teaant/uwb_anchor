@@ -13,13 +13,15 @@
 #include "uwb_msg.h"
 #include "uwb_consts.h"
 
+#include "agent.h"
+
 #define 	Tanya_Test			1
 //定义角色
-#define  	RANGING_ROLE    	ANCHOR
+#define  	RANGING_ROLE    	MY_ROLE
 
 
 #if(RANGING_ROLE == TAG)
-#define 	MY_ID				0xBBBB
+#define 	MY_ID				0xBBCC
 #define TAG_INTERVAL			5
 #else
 #define 	MY_ID				0xAAAA
@@ -99,6 +101,8 @@ typedef struct{
 	uint8_t  time_to_locate;   //-1  every superframe  锚节点遍历该值确定是否测距标签节点
 	uint8_t absence;		//缺席次数
 	uint8_t miss;
+	uint16_t times;    //测距次数
+
 }Slot_Alloc_t;
 
 typedef struct Slot_Item{

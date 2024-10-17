@@ -18,6 +18,8 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "cmsis_os.h"
+#include "crc.h"
 #include "dma.h"
 #include "usart.h"
 #include "gpio.h"
@@ -28,6 +30,9 @@
 #include <math.h>
 
 #include "aoa.h"
+
+#include "agent.h"
+#include "corecomm.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -52,10 +57,16 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
+volatile holding_reg_params_t holding_data_share __attribute__((section(".shared"))) = {0,};
+volatile input_reg_params_t   input_data_share __attribute__((section(".shared"))) = {0,};
+
+extern holding_reg_params_t hold_data ;
+extern input_reg_params_t input_data;
 
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
+void MX_FREERTOS_Init(void);
 /* USER CODE BEGIN PFP */
 #define DWT_NUM_DW_DEV   9
 /* USER CODE END PFP */
@@ -108,17 +119,29 @@ int main(void)
   MX_GPIO_Init();
   MX_DMA_Init();
   MX_USART2_UART_Init();
+  MX_CRC_Init();
   /* USER CODE BEGIN 2 */
   bufferInit();
 //  connect_wifi();
   HAL_GPIO_WritePin(WIFI_EN_GPIO_Port, WIFI_EN_Pin, GPIO_PIN_RESET);
-  	//
-  	HAL_Delay(1000);
-  	HAL_GPIO_WritePin(WIFI_EN_GPIO_Port, WIFI_EN_Pin, GPIO_PIN_SET);
-  	HAL_Delay(1000);
+//
+//  	HAL_Delay(1000);
+//  	HAL_GPIO_WritePin(WIFI_EN_GPIO_Port, WIFI_EN_Pin, GPIO_PIN_SET);
 
+  	HAL_Delay(2000);
+#if(MY_ROLE == ANCHOR)
+  //使能ESP32
+  HAL_GPIO_WritePin(WIFI_EN_GPIO_Port, WIFI_EN_Pin, GPIO_PIN_SET);
+#endif
   /* USER CODE END 2 */
 
+  /* Call init function for freertos objects (in freertos.c) */
+  MX_FREERTOS_Init();
+
+  /* Start scheduler */
+  osKernelStart();
+
+  /* We should never get here as control is now taken by the scheduler */
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 
@@ -135,7 +158,19 @@ int main(void)
 }
 
 /* USER CODE BEGIN 4 */
-
+void HAL_HSEM_FreeCallback(uint32_t SemMask){
+//__HAL_HSEM_SEMID_TO_MASK
+	switch(SemMask){
+	case __HAL_HSEM_SEMID_TO_MASK(RANGING_DATA_724_3):
+		//memcpy吧直接
+		memcpy((uint8_t*)&input_data, (uint8_t*)&input_data_share,  6 + input_data_share.node_num * 10);   //不会是之后的问题吧？
+		break;
+	case __HAL_HSEM_SEMID_TO_MASK(NEW_TAG_724_2):
+		break;
+	default:
+		break;
+	}
+}
 /* USER CODE END 4 */
 
 /**

@@ -59,6 +59,8 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 #define WIFI_EN_Pin GPIO_PIN_4
 #define WIFI_EN_GPIO_Port GPIOC
+#define LED2_Pin GPIO_PIN_14
+#define LED2_GPIO_Port GPIOD
 
 /* USER CODE BEGIN Private defines */
 

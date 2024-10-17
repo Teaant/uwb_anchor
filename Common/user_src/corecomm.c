@@ -54,7 +54,7 @@ int32_t actCM7Interrupt(int32_t n)
 {
 	uint32_t SemMask;
 	SemMask=__HAL_HSEM_SEMID_TO_MASK(n);
-	HSEM->C2IER |= SemMask;
+	HSEM->C1IER |= SemMask;
 
 }
 
@@ -62,5 +62,5 @@ int32_t actCM4Interrupt(int32_t n)
 {
 	uint32_t SemMask;
 	SemMask=__HAL_HSEM_SEMID_TO_MASK(n);
-	HSEM->C1IER |= SemMask;
+	HSEM->C2IER |= SemMask;
 }

@@ -39,5 +39,10 @@
 			<type>2</type>
 			<locationURI>PARENT-1-PROJECT_LOC/Drivers</locationURI>
 		</link>
+		<link>
+			<name>Middlewares</name>
+			<type>2</type>
+			<locationURI>PARENT-1-PROJECT_LOC/Middlewares</locationURI>
+		</link>
 	</linkedResources>
 </projectDescription>

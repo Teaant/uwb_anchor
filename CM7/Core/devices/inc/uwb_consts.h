@@ -10,10 +10,10 @@
 
 /* Default antenna delay values for 64 MHz PRF. See NOTE 1 below. */
 //#define TX_ANT_DLY 16505
-#define TX_ANT_DLY 16451
+#define TX_ANT_DLY 16401
 
 //#define RX_ANT_DLY 16505
-#define RX_ANT_DLY 16451
+#define RX_ANT_DLY 16401
 
 #define PI 3.1415926
 

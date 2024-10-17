@@ -28,6 +28,7 @@ uint8_t WiFiRcvBuffer[100];
 
 UART_HandleTypeDef huart2;
 DMA_HandleTypeDef hdma_usart2_rx;
+DMA_HandleTypeDef hdma_usart2_tx;
 
 /* USART2 init function */
 
@@ -42,7 +43,7 @@ void MX_USART2_UART_Init(void)
 
   /* USER CODE END USART2_Init 1 */
   huart2.Instance = USART2;
-  huart2.Init.BaudRate = 2304000;
+  huart2.Init.BaudRate = 115200;
   huart2.Init.WordLength = UART_WORDLENGTH_8B;
   huart2.Init.StopBits = UART_STOPBITS_1;
   huart2.Init.Parity = UART_PARITY_NONE;
@@ -136,6 +137,27 @@ void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle)
 
     __HAL_LINKDMA(uartHandle,hdmarx,hdma_usart2_rx);
 
+    /* USART2_TX Init */
+    hdma_usart2_tx.Instance = DMA1_Stream1;
+    hdma_usart2_tx.Init.Request = DMA_REQUEST_USART2_TX;
+    hdma_usart2_tx.Init.Direction = DMA_MEMORY_TO_PERIPH;
+    hdma_usart2_tx.Init.PeriphInc = DMA_PINC_DISABLE;
+    hdma_usart2_tx.Init.MemInc = DMA_MINC_ENABLE;
+    hdma_usart2_tx.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
+    hdma_usart2_tx.Init.MemDataAlignment = DMA_MDATAALIGN_BYTE;
+    hdma_usart2_tx.Init.Mode = DMA_NORMAL;
+    hdma_usart2_tx.Init.Priority = DMA_PRIORITY_LOW;
+    hdma_usart2_tx.Init.FIFOMode = DMA_FIFOMODE_DISABLE;
+    if (HAL_DMA_Init(&hdma_usart2_tx) != HAL_OK)
+    {
+      Error_Handler();
+    }
+
+    __HAL_LINKDMA(uartHandle,hdmatx,hdma_usart2_tx);
+
+    /* USART2 interrupt Init */
+    HAL_NVIC_SetPriority(USART2_IRQn, 6, 0);
+    HAL_NVIC_EnableIRQ(USART2_IRQn);
   /* USER CODE BEGIN USART2_MspInit 1 */
 
   /* USER CODE END USART2_MspInit 1 */
@@ -161,6 +183,10 @@ void HAL_UART_MspDeInit(UART_HandleTypeDef* uartHandle)
 
     /* USART2 DMA DeInit */
     HAL_DMA_DeInit(uartHandle->hdmarx);
+    HAL_DMA_DeInit(uartHandle->hdmatx);
+
+    /* USART2 interrupt Deinit */
+    HAL_NVIC_DisableIRQ(USART2_IRQn);
   /* USER CODE BEGIN USART2_MspDeInit 1 */
 
   /* USER CODE END USART2_MspDeInit 1 */
@@ -168,203 +194,50 @@ void HAL_UART_MspDeInit(UART_HandleTypeDef* uartHandle)
 }
 
 /* USER CODE BEGIN 1 */
-int __io_putchar(int ch){
-	HAL_UART_Transmit(&huart2, (uint8_t*)ch, 1, 10);
-	return ch;
+int _write(int file, char *ptr, int len){
+	(void)file;
+	HAL_UART_Transmit_DMA(&huart2, (uint8_t*)ptr,len);   //�?flush�?�？
+	return len;
 }
 
+/**
+ * huart->ReceptionType = HAL_UART_RECEPTION_TOIDLE;
+	if (huart->ReceptionType == HAL_UART_RECEPTION_TOIDLE)
+	{
+	   __HAL_UART_CLEAR_FLAG(huart, UART_CLEAR_IDLEF);
+	   ATOMIC_SET_BIT(huart->Instance->CR1, USART_CR1_IDLEIE);
+	}
+ */
+HAL_StatusTypeDef HAL_UART_Receive_DMA_ToIdle(UART_HandleTypeDef *huart, uint8_t *pData, uint16_t Size)
+{
+  /* Check that a Rx process is not already ongoing */
+  if (huart->RxState == HAL_UART_STATE_READY)
+  {
+    if ((pData == NULL) || (Size == 0U))
+    {
+      return HAL_ERROR;
+    }
 
-void connect_wifi(void) {
+    /* Set Reception type to IDLE reception */
+    huart->ReceptionType = HAL_UART_RECEPTION_TOIDLE;
+    __HAL_UART_CLEAR_FLAG(huart, UART_CLEAR_IDLEF);
+    ATOMIC_SET_BIT(huart->Instance->CR1, USART_CR1_IDLEIE);  //使能空闲中断
 
-	huart2.Instance->CR1 &= ~(0x0001 << 4);
-	//初始化DMA
-	HAL_DMA_Init(&hdma_usart2_rx);
-	//�????????????????????????????????????????????启DMA接收
-	HAL_UART_Receive_DMA(&huart2, WiFiRcvBuffer, WiFiMaxRcvSize);
-	//	//复位
-	HAL_GPIO_WritePin(WIFI_EN_GPIO_Port, WIFI_EN_Pin, GPIO_PIN_RESET);
-	//
-	HAL_Delay(1000);
-	HAL_GPIO_WritePin(WIFI_EN_GPIO_Port, WIFI_EN_Pin, GPIO_PIN_SET);
-	HAL_Delay(1000);
-
-	HAL_UART_Transmit(&huart2, (uint8_t*) "+++", 3, 200);
-	HAL_Delay(1000);
-	memset(WiFiRcvBuffer, '\0', WiFiMaxRcvSize);
-	//初始化DMA
-	HAL_DMA_Init(&hdma_usart2_rx);
-	//�????????????????????????????????????????????启DMA接收
-	HAL_UART_Receive_DMA(&huart2, WiFiRcvBuffer, WiFiMaxRcvSize);
-
-	printf("AT+CIPMODE=0\r\n");
-	HAL_Delay(1000);
-	memset(WiFiRcvBuffer, '\0', WiFiMaxRcvSize);
-	//初始化DMA
-	HAL_DMA_Init(&hdma_usart2_rx);
-	//�????????????????????????????????????????????启DMA接收
-	HAL_UART_Receive_DMA(&huart2, WiFiRcvBuffer, WiFiMaxRcvSize);
-
-	printf("AT+CIPCLOSE\r\n");
-	HAL_Delay(1000);
-	memset(WiFiRcvBuffer, '\0', WiFiMaxRcvSize);
-	//初始化DMA
-	HAL_DMA_Init(&hdma_usart2_rx);
-	//�????????????????????????????????????????????启DMA接收
-	HAL_UART_Receive_DMA(&huart2, WiFiRcvBuffer, WiFiMaxRcvSize);
-
-	printf("AT+RST\r\n");
-	HAL_Delay(2000);
-	memset(WiFiRcvBuffer, '\0', WiFiMaxRcvSize);
-	//初始化DMA
-	HAL_DMA_Init(&hdma_usart2_rx);
-	//�????????????????????????????????????????????启DMA接收
-	HAL_UART_Receive_DMA(&huart2, WiFiRcvBuffer, WiFiMaxRcvSize);
-
-	do {
-		//使用时将UART2波特率设置为2304000
-		//假设ESP32波特率也 ?2304000
-		//则直接进行AT指令
-		HAL_DMA_Init(&hdma_usart2_rx);
-		HAL_UART_Receive_DMA(&huart2, WiFiRcvBuffer, WiFiMaxRcvSize);
-		memset(WiFiRcvBuffer, '\0', WiFiMaxRcvSize);
-		printf("ATE0\r\n");
-		HAL_Delay(500);
-		if (WiFiRcvBuffer[2] == 'O' && WiFiRcvBuffer[3] == 'K') {
-			//若指令正确返回，说明波特率匹配，直接 ?出即 ?
-			break;
-		}
-		HAL_DMA_Init(&hdma_usart2_rx);
-		HAL_UART_Receive_DMA(&huart2, WiFiRcvBuffer, WiFiMaxRcvSize);
-		//若指令没有正确返回，则将UART2波特率设置为115200，再次进行AT指令
-		huart2.Init.BaudRate = 115200;
-		HAL_UART_Init(&huart2);
-		memset(WiFiRcvBuffer, '\0', WiFiMaxRcvSize);
-		printf("ATE0\r\n");
-		HAL_Delay(500);
-		if (WiFiRcvBuffer[2] == 'O' && WiFiRcvBuffer[3] == 'K') {
-			//若指令正确返回，说明波特率匹配，将其设置 ?2304000
-			break;
-
-		}
-		huart2.Init.BaudRate = 2304000;
-		HAL_UART_Init(&huart2);
-
-	} while (WiFiRcvBuffer[2] != 'O' || WiFiRcvBuffer[3] != 'K');
-
-	do {
-		//初始化DMA
-		HAL_DMA_Init(&hdma_usart2_rx);
-		//DMA接收
-		HAL_UART_Receive_DMA(&huart2, WiFiRcvBuffer, WiFiMaxRcvSize);
-		memset(WiFiRcvBuffer, '\0', WiFiMaxRcvSize);
-		//SoftAP+Station
-		printf("AT+CWMODE=3\r\n");
-		HAL_Delay(500);
-		//		printf("%s",WiFiRcvBuffer);
-
-
-	} while (WiFiRcvBuffer[2] != 'O' || WiFiRcvBuffer[3] != 'K');
-
-	uint8_t flag = 0;
-	do {
-
-		uint8_t tempstr[] = "OK\r\n\0\0";
-
-		memset(WiFiRcvBuffer, '\0', WiFiMaxRcvSize);
-		//初始化DMA
-		HAL_DMA_Init(&hdma_usart2_rx);
-		//DMA接收
-		HAL_UART_Receive_DMA(&huart2, WiFiRcvBuffer, WiFiMaxRcvSize);
-		//连接WiFi
-		//		printf("AT+CWJAP=\"AU3#506\",\"password\"\r\n");
-		printf("AT+CWJAP=\"Tanya\",\"tanyanderedian\"\r\n");
-		//		printf("AT+CWJAP=\"zhuran\",\"10121012\"\r\n");
-		HAL_Delay(1000);
-		//		printf("%s",WiFiRcvBuffer);
-
-		for (int i = 0; i <= 80; i++) {
-			if (memcmp(tempstr, &WiFiRcvBuffer[i], (sizeof(tempstr) - 1))
-					== 0) {
-				flag = 1;
-				break;
-			}
-		}
-		//	}while((WiFiRcvBuffer[5] != 'C' || WiFiRcvBuffer[6] != 'O') && (WiFiRcvBuffer[22] != 'C' || WiFiRcvBuffer[23] != 'O'));
-	} while (flag != 1);
-
-	HAL_DMA_Init(&hdma_usart2_rx);
-
-	do {
-		//		printf("AT+CIPCLOSE");
-
-		memset(WiFiRcvBuffer, '\0', WiFiMaxRcvSize);
-
-		//连接TCP服务�????????????????????????????????????????????
-		//		printf("AT+CIPSTART=\"UDP\",\"192.168.1.104\",8080\r\n");
-
-		//初始化DMA
-		HAL_DMA_Init(&hdma_usart2_rx);
-		//DMA接收
-		HAL_UART_Receive_DMA(&huart2, WiFiRcvBuffer, WiFiMaxRcvSize);
-		//		UDP
-		//		printf("AT+CIPSTART=\"UDP\",\"192.168.31.135\",8080\r\n");
-		printf("AT+CIPSTART=\"UDP\",\"192.168.137.1\",8080\r\n");
-		//		printf("AT+CIPSTART=\"UDP\",\"192.168.1.127\",8080\r\n");
-		//		printf("AT+CIPSTART=\"UDP\",\"192.168.1.104\",8090\r\n");
-
-		//		printf("AT+CIPSTART=\"UDP\",\"192.168.43.1\",8080\r\n");
-
-		//printf("AT+CIPSTART=\"TCP\",\"192.168.137.1\",8080\r\n");
-
-		//		printf("%s",WiFiRcvBuffer);
-		HAL_Delay(1000);
-
-
-
-	} while (WiFiRcvBuffer[0] != 'C');
-	do {
-
-		memset(WiFiRcvBuffer, '\0', WiFiMaxRcvSize);
-		//初始化DMA
-		HAL_DMA_Init(&hdma_usart2_rx);
-		//DMA接收
-		HAL_UART_Receive_DMA(&huart2, WiFiRcvBuffer, WiFiMaxRcvSize);
-		//获取IP
-		printf("AT+CIFSR\r\n");
-		HAL_Delay(1000);
-		//		printf("%s",WiFiRcvBuffer);
-	} while (WiFiRcvBuffer[1] != 'C' || WiFiRcvBuffer[3] != 'F');
-	//wifi连接成功后使用ID地址作为ID
-	//	agent.ID = 100*(WiFiRcvBuffer[85]-48)+10*(WiFiRcvBuffer[86]-48)+(WiFiRcvBuffer[87]-48);
-
-	do {
-		//初始化DMA
-		HAL_DMA_Init(&hdma_usart2_rx);
-		//DMA接收
-		HAL_UART_Receive_DMA(&huart2, WiFiRcvBuffer, WiFiMaxRcvSize);
-		memset(WiFiRcvBuffer, '\0', WiFiMaxRcvSize);
-
-		//使能透传模式浣胯兘閫忎紶妯�?�紡
-		printf("AT+CIPMODE=1\r\n");
-		HAL_Delay(1000);
-		//		printf("%s",WiFiRcvBuffer);
-
-	} while (WiFiRcvBuffer[2] != 'O' || WiFiRcvBuffer[3] != 'K');
-
-	do {
-
-		memset(WiFiRcvBuffer, '\0', WiFiMaxRcvSize);
-		//初始化DMA
-		HAL_DMA_Init(&hdma_usart2_rx);
-		//DMA接收
-		HAL_UART_Receive_DMA(&huart2, WiFiRcvBuffer, WiFiMaxRcvSize);
-		//发�?�模�????????????????????????????????????????????
-		printf("AT+CIPSEND\r\n");
-		HAL_Delay(1000);
-
-	} while (WiFiRcvBuffer[2] != 'O' || WiFiRcvBuffer[3] != 'K');
-
-	printf("ESP32 connected.\r\n");
+    if (!(IS_LPUART_INSTANCE(huart->Instance)))
+    {
+      /* Check that USART RTOEN bit is set */
+      if (READ_BIT(huart->Instance->CR2, USART_CR2_RTOEN) != 0U)
+      {
+        /* Enable the UART Receiver Timeout Interrupt */
+        ATOMIC_SET_BIT(huart->Instance->CR1, USART_CR1_RTOIE);
+      }
+    }
+    return (UART_Start_Receive_DMA(huart, pData, Size));   //会使能DMA中断
+  }
+  else
+  {
+    return HAL_BUSY;
+  }
 }
 
 /* USER CODE END 1 */

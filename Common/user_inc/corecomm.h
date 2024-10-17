@@ -4,25 +4,32 @@
 #include "main.h"
 #include <stdlib.h>
 #include <string.h>
-//HSEM
-#define GET_TARGET_ANG_HSEM 20
-#define GET_ACC_MEM_HSEM 21
-#define END_ACC_MEM_HSEM 22
-#define AOA_CALI_COMMAND_HSEM 23
-#define AOA_CALI_RESULT_HSEM 24
+////HSEM
+//#define GET_TARGET_ANG_HSEM 20
+//#define GET_ACC_MEM_HSEM 21
+//#define END_ACC_MEM_HSEM 22
+//#define AOA_CALI_COMMAND_HSEM 23
+//#define AOA_CALI_RESULT_HSEM 24
+//
+//#define I2C2_BUSY_HSEM 30
+//#define ENABLE_CM4_HSEM 31
+//#define IMU_FUSION_COMPLETE_HSEM 5
+//#define IMU_TEST_MAG_HSEM 3
+////BUFFER
+//#define TARGET_ANG_BUFFER 10
+//#define ACC_MEM_BUFFER 11
+//#define AOA_CALI_COMMAND_BUFFER 12
+//#define AOA_CALI_RESULT_BUFFER 13
+//
+//#define IMU_FUSION_BUFFER 5
+//#define IMU_TEST_MAG_BUFFER 3
 
-#define I2C2_BUSY_HSEM 30
-#define ENABLE_CM4_HSEM 31
-#define IMU_FUSION_COMPLETE_HSEM 5
-#define IMU_TEST_MAG_HSEM 3
-//BUFFER
-#define TARGET_ANG_BUFFER 10
-#define ACC_MEM_BUFFER 11
-#define AOA_CALI_COMMAND_BUFFER 12
-#define AOA_CALI_RESULT_BUFFER 13
+//定义内核间硬件信号量的ID
+#define	NEW_TAG_724_2		2
 
-#define IMU_FUSION_BUFFER 5
-#define IMU_TEST_MAG_BUFFER 3
+#define RANGING_DATA_724_3	3
+
+#define	NEW_CONFIG_427_4	4
 
 typedef int32_t (*writeBuffer_t) (void*,int);
 typedef int32_t (*readBuffer_t) (void*,int);

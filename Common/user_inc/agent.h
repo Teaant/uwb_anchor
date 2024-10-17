@@ -4,13 +4,16 @@
 
 # include "main.h"
 
+#define ANCHOR 	1
+#define TAG		2
 
+#define MY_ROLE		ANCHOR
 
 //保留过去N组位移和距离信息
 //那么线性方程组矩阵有N-1阶
 # define N 50
 
-
+#define	MAX_NODE	51
 
 //设置UWB测距时平均值滤波的采样数，应考虑系统的实时性
 //目前leader每50ms进行一次poll可以正常运行，每个个体1秒钟左右进行一次坐标更新
@@ -18,19 +21,55 @@
 //这样的话每个个体每隔50ms*M*A时间进行一次坐标更新
 # define M 5
 
+#pragma pack(push, 1)
+//Tanya_begin
+typedef struct{
+	uint16_t tag_id;
+	//uint16_t interval_absence;   //在STM32那边就按照高低字节 ~  interval  absence
+	uint8_t interval;
+	uint8_t absence;
+	uint16_t distance;
+	int16_t angle;
+	uint16_t times;    //测距次数
+}Tag_Ranging_t;   // 2 * 5 = 10B
+//是很多这样子的集合吗？还有就是
 
-# define DEFAULT_LEADER_ID 101
 
-# define GET_ID_HSEM 29
-# define DISPLACEMENT_UPDATE_HSEM 28
-# define GET_COORDINATE_HSEM 14
-# define IMU_UPDATE_HSEM 15
+typedef struct
+{
+	//cid 0
+	uint16_t my_id;
+	uint16_t my_pan_id;
+	//uint16_t node_num_available;     //available   num
+	uint8_t available;
+	uint8_t node_num;
+
+	//cid 1  ,先读取node_num，然后按照数量读取下面的node_values
+	Tag_Ranging_t nodes_value1[MAX_NODE];      //40
+//	//cid 2
+//	Tag_Ranging_t nodes_value2[SECOND_NUM];
+//	//cid 3
+//	Tag_Ranging_t nodes_value3[THIRD_NUM];
+
+} input_reg_params_t;
 
 
-# define UPDATE_COORDINATE_WITH_ID 16
+typedef struct
+{
+	uint16_t my_id;
+	uint16_t my_pan_id;
+	uint8_t my_role;
+	uint8_t interval;
+	uint8_t micro_tb_num;
+	uint8_t mx_node;
+	//uint16_t my_role_interval;
+	//uint16_t micro_tb_mx_node;
 
-# define MSG_TYPE_QUERY_ID 5
-# define MSG_TYPE_CONFIRM_ID 6
+} holding_reg_params_t;
+
+#pragma pack(pop)
+//Tanya_end
+
 
 
 typedef struct{

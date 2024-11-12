@@ -190,7 +190,7 @@ int32_t uwbInit(uint16_t ID, uint8_t role)
 		//end
 		/* Apply default antenna delay value. See NOTE 1 below. */
 		dwt_setrxantennadelay(RX_ANT_DLY, pports);
-		dwt_settxantennadelay(TX_ANT_DLY, pports);
+		dwt_settxantennadelay(TX_ANT_DLY, pports);     //但是奇怪了哈，明明官方所推荐的是接收延迟更高才是
 
 		/* Set preamble timeout for expected frames. See NOTE 6 below. */
 		dwt_setpreambledetecttimeout(PRE_TIMEOUT, pports);
@@ -308,7 +308,7 @@ void txOkCallback(const dwt_cb_data_t *cbData, UWBPortTypeDef *pports){
 #else
 	if(record_ts == 1){
 		Tag_Set_GotoSleep(uwb_node.interval * SUPERFRAME_TB_NUM - 10 * MICRO_TB_NUM);
-		uwb_node.sub_state = sleeping;  //对吼 ~
+		uwb_node.sub_state = sleeping;
 		record_ts = 0;
 	}
 #endif

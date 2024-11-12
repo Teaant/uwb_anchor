@@ -7,10 +7,12 @@
 #define ANCHOR 	1
 #define TAG		2
 
-#define MY_ROLE		ANCHOR
+#define MY_ROLE		TAG
+
 
 //保留过去N组位移和距离信息
 //那么线性方程组矩阵有N-1阶
+
 # define N 50
 
 #define	MAX_NODE	51

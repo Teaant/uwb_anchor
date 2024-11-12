@@ -10,10 +10,10 @@
 
 /* Default antenna delay values for 64 MHz PRF. See NOTE 1 below. */
 //#define TX_ANT_DLY 16505
-#define TX_ANT_DLY 16401
+#define TX_ANT_DLY 16451
 
 //#define RX_ANT_DLY 16505
-#define RX_ANT_DLY 16401
+#define RX_ANT_DLY 16381
 
 #define PI 3.1415926
 
@@ -23,13 +23,15 @@
 #define UWB_REPLY_INTERVAL  (3)
 #define MICRO_SLOT_US		(TBASE * MICRO_TB_NUM)
 
-#define SUPERFRAME_TB_NUM	10000
+//1s   10000 				10ms	100
+#define SUPERFRAME_TB_NUM	100
 
 
 # define DEFAULT_ANT_DELAY 16451
 /* UWB microsecond (uus) to device time unit (dtu, around 15.65 ps) conversion factor.
  * 1 uus = 512 / 499.2 �s and 1 �s = 499.2 * 128 dtu. */
-#define UUS_TO_DWT_TIME 63898   //  63898   us -> 转化成DW1000的1us的时间更加精确点似乎是  1us * 499.2e6*128 =
+//
+#define UUS_TO_DWT_TIME 63898   //  63898   us -> 转化成DW1000的1us的时间更加精确点似乎是  1us * 499.2e6 * 128 =
 //发送后进入接收的
 #define POLL_TX_TO_RESP_RX_DLY_UUS	0
 

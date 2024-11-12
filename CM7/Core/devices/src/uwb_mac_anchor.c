@@ -39,6 +39,7 @@ volatile static uint8_t ranging_group_num = 0;
 
 volatile  uint8_t ranging_num;
 volatile  uint8_t ranging_groups = 0;
+
 volatile UWB_RangingValue_t  ranging_tags_value[51] __attribute__((section(".shared")));
 
 volatile UWB_Data_Frame_t resp_buffer ={0,};
@@ -228,15 +229,12 @@ void prepare_beacon(uint16_t id){
 	Anchor_Set_Compare(SUPERFRAME_TB_NUM -1, send_beacon);
 
 }
-
+//发送延迟可以造成0.257us的时钟偏差
 void send_beacon(void){
-
 	//void prepare_beacon(uint16_t id)   时候已经关闭接收了 ~
 	UWB_StartTx(1); //要马上进入接收所以，此处expect_rx
 	//复位计数器
-
 //	Reset_Timer();   //在发送完成之后再重置定时器
-
 	setTxDoneCallback(beaconDoneCb);
 }
 
@@ -318,9 +316,9 @@ void myTxDoneCb(void){
 	}
 }
 
-//Reset_Timer有点奇怪的 ~ 所以是怎么回事？ 怎么这边Reset的时候会怎么样吗？
 void beaconDoneCb(void){
 	Reset_Timer();
+	uwb_node.beacon_time ++;
 	current_micro_slot = 0;
 	if(ranging_groups == 0){
 		Anchor_Set_Compare(SUPERFRAME_TB_NUM/2, start_prepare_beacon);  //难不成这个比较还是必须是相等的时候才行吗？   //先只发一次看看 ~
@@ -480,7 +478,7 @@ void calculate_distance(uint16_t index){
 
 	//来自文档(App Note APS013)的神秘公式   神秘公式不神秘 ~
 	tof_dtu = (int64)(((double)ranging_tags_value[index].R1 * (double)ranging_tags_value[index].R2 - (double)ranging_tags_value[index].D1 * (double)ranging_tags_value[index].D2) / ((double)ranging_tags_value[index].R1 + (double)ranging_tags_value[index].R2 + (double)ranging_tags_value[index].D1 + (double)ranging_tags_value[index].D2));
-	ranging_tags_value[index].distance = (float)tof_dtu*DWT_TIME_UNITS*SPEED_OF_LIGHT;
+	ranging_tags_value[index].distance = (float)tof_dtu * DWT_TIME_UNITS * SPEED_OF_LIGHT;
 	ranging_tags_value[index].ptag->slot_alloc.times ++;
 	//Tanya_add  这个的单位是m ？
 	if(ranging_tags_value[index].distance < 0.3)

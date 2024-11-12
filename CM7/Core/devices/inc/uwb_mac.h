@@ -19,6 +19,12 @@
 //定义角色
 #define  	RANGING_ROLE    	MY_ROLE
 
+/**
+ * @TODO  to-do work
+ * 1. change interval, raised by tag   这样我也需要在introduce当中讲明有这样子的一个系统需求 ~
+ * 2. two chance for re-DS-TWR when it is fail at the GTS     因为实际上我们发现我们实际使用的很少哎，你看，然后我们就使用这样的方式保证定位
+ * 	然后这个也可以做仿真，比方说出现了错误，然后选择后面的来实现，仿真看是不是会产生冲突，随机选择一个，要以1 3 6这样子的方式，因为不再需要这边的了
+ */
 
 #if(RANGING_ROLE == TAG)
 #define 	MY_ID				0xBBCC
@@ -182,6 +188,7 @@ typedef struct{
 
 	UWB_Msg_Header_t header;
 #if(RANGING_ROLE == ANCHOR)
+	uint16_t beacon_time;
 	PDoA_RX_Buffer pdoa_buffer;
 #endif
 	uint8_t rxBuffer[128];       //125

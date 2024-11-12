@@ -22,6 +22,7 @@ uint16_t  applying_anchor, applying_pan_id;
 
 UWB_RangingValue_t ranging_anchor_values;
 
+uint8_t expect_interval;
 
 static slot_alloc_node_t* anchor_table;
 
@@ -108,6 +109,7 @@ static void remove_anchor_from_table(uint16_t id){
 void initTag(void){
 	uwb_node.state = outside;
 	uwb_node.sub_state = idle;
+	expect_interval = uwb_node.interval;
 	UWB_ENABLE_RX(&uwb_node.device->ports[0]);  //开启接收
 }
 
@@ -223,7 +225,10 @@ void uwb_handle_beacon(uint16_t id){
 		//复位
 		Reset_Timer();  //复位计数器
 		current_micro_slot = 0;
-//		ranging_anchor_values.panchor->slot_alloc.absence = 0; //连续几次没有收到锚节点消息   现在不需要这个了，因为有超时接收定时器
+		superframe.cfp_macro_slot_num = pbeacon->CFP_num;
+		superframe.anchor_id = uwb_node.header.src;
+		superframe.pan_id = uwb_node.header.pan_id;
+		superframe.cap_macro_slot_num = pbeacon->CAP_num;
 		for(int i = 0; i< pbeacon->CFP_num ; i++){
 			if(*(pTags+i) == uwb_node.id){
 				tick1 = my_timer.htim->Instance->CNT;
@@ -278,9 +283,10 @@ void uwb_handle_resp(uint16_t id){
 	packFinal(uwb_node.txBuffer);
 	//send
 	UWB_SEND_RANGING_FINAL(uwb_node.txBuffer, final_tx_time);
-	uwb_node.sub_state = finaling;    //为什么不进入睡眠？
+	uwb_node.sub_state = finaling;
 	record_ts = 1;
 	//进入睡眠
+
 
 }
 

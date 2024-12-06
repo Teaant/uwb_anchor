@@ -29,7 +29,11 @@
 # define DEFAULT_ANT_DELAY 16451
 /* UWB microsecond (uus) to device time unit (dtu, around 15.65 ps) conversion factor.
  * 1 uus = 512 / 499.2 �s and 1 �s = 499.2 * 128 dtu. */
-#define UUS_TO_DWT_TIME 63898   //  63898   us -> 转化成DW1000的1us的时间更加精确点似乎是  1us * 499.2e6*128 =
+#define UUS_TO_DWT_TIME 	63898   //  63898   us -> 转化成DW1000的1us的时间更加精确点似乎是  1us * 499.2e6*128 =
+#define MS_TO_DWT_TIME		63897600
+#define S_TO_DWT_TIME		62899200000
+//传输延迟：100/3/1000000000 = 333ns   以100m，10m就是33.3ns,应该已经还是挺小的了，按道理来说这个时候的同步误差就是几十、一百多个ns
+
 //发送后进入接收的
 #define POLL_TX_TO_RESP_RX_DLY_UUS	0
 

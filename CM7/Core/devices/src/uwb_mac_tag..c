@@ -108,7 +108,7 @@ static void remove_anchor_from_table(uint16_t id){
 void initTag(void){
 	uwb_node.state = outside;
 	uwb_node.sub_state = idle;
-	UWB_ENABLE_RX(&uwb_node.device->ports[0]);  //开启接收
+
 }
 
 //其实完全也是可以放在main当中的？
@@ -268,6 +268,7 @@ void uwb_handle_resp(uint16_t id){
 	ranging_anchor_values.poll_tx_ts = get_tx_timestamp_u64(&(uwb_node.device->ports[0]));
 	ranging_anchor_values.resp_rx_ts = get_rx_timestamp_u64(&(uwb_node.device->ports[0]));
 	/* Compute final message transmission time. See NOTE 10 below. */
+	//话说这不需要考虑溢出吗？ 低八位就是512了，是多长时间，万一呢就是说，这就有挺多的问题啊感觉
 	final_tx_time = (ranging_anchor_values.resp_rx_ts + (RESP_RX_TO_FINAL_TX_DLY_UUS * UUS_TO_DWT_TIME)) >> 8;
 #if(Tanya_Test)
 	uint32_t timer_tick = my_timer.htim->Instance->CNT;

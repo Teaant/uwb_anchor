@@ -184,9 +184,9 @@ int32_t uwbInit(uint16_t ID, uint8_t role)
 		dwt_configure(&config, pports);
 
 		//2024.06.03  发射功测试
-		dwt_setsmarttxpower(0, pports);
-		//设置发射功率
-		dwt_configuretxrf(&config_t, pports);
+//		dwt_setsmarttxpower(0, pports);
+//		//设置发射功率
+//		dwt_configuretxrf(&config_t, pports);
 		//end
 		/* Apply default antenna delay value. See NOTE 1 below. */
 		dwt_setrxantennadelay(RX_ANT_DLY, pports);
@@ -352,8 +352,28 @@ void UWB_StartTx(uint8_t is_expect){
 	}else{
 		dwt_starttx(DWT_START_TX_IMMEDIATE , pports);
 	}
+}
+
+void UWB_Write_Tx_Buffer_in_Addr(uint8_t* pdata, uint8_t len, uint16_t Tx_buffer_addr){
+	UWBPortTypeDef *pports = &(uwb_node.device->ports[0]);
+	//	while(tx_state == Buffer_busy){;}   //大抵好像是卡在了这里  怎么是卡在了此处？ 发送不成功吗？ 没有成功发送？
+	dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS, pports);
+	dwt_writetxdata(len, pdata, Tx_buffer_addr, pports); /* Non-Zero offset in TX buffer. */
 
 }
+void UWB_StartTx_in_Addr(uint8_t is_expect,uint8_t len,  uint16_t Tx_buffer_addr){
+
+	UWBPortTypeDef *pports = &(uwb_node.device->ports[0]);
+	dwt_writetxfctrl(len, Tx_buffer_addr, 0, pports); /* Zero offset in TX buffer, ranging. */
+	tx_state = Buffer_busy;
+	if(is_expect == 1){
+		dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED, pports);
+	}else{
+		dwt_starttx(DWT_START_TX_IMMEDIATE , pports);
+	}
+}
+
+
 
 //发送消息 (2)
 void UWB_Send(uint8_t * pdata, uint8_t len, If_Delay_t is_delayed, uint32_t tx_time, If_Expected_t is_expect)
@@ -393,6 +413,16 @@ uint64_t getDeltaT(uint64_t ts1, uint64_t ts2)
 	{
 		return ts1+(0xFFFFFFFFFF-ts2);
 	}
+}
+
+uint64_t getSumT(uint64_t ts1, uint64_t ts2){
+	//加，超出就减去
+	uint64_t ts = ts1+ts2;
+	if(ts > 0xFFFFFFFFFF){
+		ts = ts - 0xFFFFFFFFFF - 1;
+	}
+	return ts;
+
 }
 
 

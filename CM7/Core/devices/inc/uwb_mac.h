@@ -190,9 +190,6 @@ typedef struct{
 
 }UWB_Node_t;
 
-//随机数生成，有硬件支持 ~
-
-
 /*
 基准时间 100us			autoReload = 100-1;  ---> 中断
 时钟精度 1us             preScale ---->  1us
@@ -228,6 +225,8 @@ typedef struct{
  * 根据role初始化节点结构体的参数
  */
 uint8_t initNode(uint8_t role, TIM_HandleTypeDef* htim);
+void start_run(void);
+
 void Inc_Uwb_Tick(void);
 
 void Reset_Timer(void);
@@ -245,6 +244,8 @@ void Tag_Start_Monitor(void);
 void Anchor_Set_Compare(uint32_t next_compare, compare_callback callback);
 void Anchor_Stop_CompareTag(uint8_t tag_index);
 void Anchor_Set_CompareTag(uint8_t index, uint32_t next_compare, anchor_tag_callback callback, uint8_t param);
+
+//其实我只要实现一个频率同步就差不多了
 
 
 #endif /* DEVICES_INC_UWB_MAC_H_ */

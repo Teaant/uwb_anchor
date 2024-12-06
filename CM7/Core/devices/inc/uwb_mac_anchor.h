@@ -11,6 +11,28 @@
 #include "main.h"
 #include "uwb_mac.h"
 
+//一轮周期大约17s   //		1099511627775
+//一秒钟走过的tick
+//延迟发送的设定时间是8ns精度的 	低9位全0
+
+
+typedef struct{
+
+	uint8_t tx_b_valid;
+	uint8_t resp1;
+	uint8_t resp2;
+	uint8_t resp3;
+
+	uint64_t Tx_Beacon;
+	uint64_t Next_Beacon;
+
+	uint64_t Tx_resp1;
+	uint64_t Tx_resp2;
+	uint64_t Tx_resp3;
+
+}Times_Struct_t;
+
+
 void initAnchor(void);
 
 void start_prepare_beacon(void);

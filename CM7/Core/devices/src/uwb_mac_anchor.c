@@ -23,17 +23,10 @@ extern UWB_Node_t uwb_node;
 extern Timer_t my_timer;
 
 volatile static uint32_t timer_tick;
-//typedef void(*poll_timeout_cb)(uint8_t index);
-//typedef void(*resp_issue_cb)(uint8_t index);
-//typedef void(*final_timeout_cb)(uint8_t index);
-//
-//poll_timeout_cb  poll_timeout_cbs[3] = {poll_timeout_cb1, poll_timeout_cb2 , poll_timeout_cb3};
-//resp_issue_cb  	resp_issue_cbs[3] = {resp_issue_cb1, resp_issue_cb2 , resp_issue_cb3};
-//final_timeout_cb	final_timeout_cbs[3] = {final_timeout_cbs1, final_timeout_cbs2, final_timeout_cbs3};
-//
+
 
 volatile static uint8_t tags_num = 0;
-slot_alloc_node_t* tags_table, *ptail;//还是加一个尾巴吧，不好看总是
+slot_alloc_node_t* tags_table;
 
 volatile static uint8_t ranging_group_num = 0;
 
@@ -66,7 +59,6 @@ extern volatile input_reg_params_t   input_data __attribute__((section(".shared"
 void initAnchor(void){
 
 	tags_table = NULL;
-	ptail = NULL;
 
 	//初始化resp的数据缓冲区，后续只需要修改 dist， sequence即可
 	resp_buffer.header.control = RESP_CONTROL;
@@ -169,9 +161,9 @@ void prepare_beacon(uint16_t id){
 	/**
 	 * @Tip  关闭UWB接收机
 	 */
-//	Anchor_Stop_CompareTag(1);
-//	Anchor_Stop_CompareTag(2);
-//	Anchor_Stop_CompareTag(3);
+	Anchor_Stop_CompareTag(1);
+	Anchor_Stop_CompareTag(2);
+	Anchor_Stop_CompareTag(3);
 
 	UWB_DISABLE_RX(&uwb_node.device->ports[0]);
 	/**

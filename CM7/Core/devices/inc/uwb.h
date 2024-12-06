@@ -1,3 +1,6 @@
+#ifndef __UWB_H_
+#define __UWB_H_
+
 #include <stdio.h>
 #include <string.h>
 
@@ -13,9 +16,12 @@
 
 //Tanya_add
 //This is a file of UWB PHY layer
+#define	TX_BUFFER_1		0
+#define TX_BUFFER_2		256
+#define TX_BUFFER_3		512
+#define TX_BUFFER_4		768
 
-#ifndef __UWB_H_
-#define __UWB_H_
+
 
 typedef void(*txDoneCb)(void);
 
@@ -53,10 +59,17 @@ uint64 get_tx_timestamp_u64(UWBPortTypeDef *pports);
 uint64 get_rx_timestamp_u64(UWBPortTypeDef *pports);
 
 uint64_t getDeltaT(uint64_t,uint64_t);
+uint64_t getSumT(uint64_t, uint64_t);
 
 
 void UWB_Write_Tx_Buffer(uint8_t* pdata, uint8_t len);
 void UWB_StartTx(uint8_t is_expect);
+
+
+void UWB_Write_Tx_Buffer_in_Addr(uint8_t* pdata, uint8_t len, uint16_t Tx_buffer_addr);
+void UWB_StartTx_in_Addr(uint8_t is_expect,uint8_t len,  uint16_t Tx_buffer_addr);
+
+
 void UWB_Send(uint8_t * pdata, uint8_t len, If_Delay_t is_delayed, uint32_t tx_time, If_Expected_t is_expect);
 
 

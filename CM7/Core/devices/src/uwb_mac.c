@@ -10,6 +10,7 @@
 #include "uwb_mac_anchor.h"
 #include "uwb_mac_tag.h"
 
+#include "mem_manager.h"
 
 
 static volatile uint32_t uwb_tick = 0;   //或可估计当前的一个值
@@ -43,6 +44,15 @@ uint8_t initNode(uint8_t role, TIM_HandleTypeDef* htim){
 	#endif
 	return 0;
 }
+
+void start_run(void){
+#if(RANGING_ROLE == ANCHOR)
+ 	prepare_beacon(uwb_node.id);
+#else
+	UWB_ENABLE_RX(&uwb_node.device->ports[0]);  //开启接收
+#endif
+}
+
 
 void Inc_Uwb_Tick(void){
 

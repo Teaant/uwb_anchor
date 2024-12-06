@@ -58,6 +58,8 @@
 #define HSEM_ID_0 (0U) /* HW semaphore 0*/
 #endif
 
+#define RUN_PROTOCOL	1
+#define TEST_TX_BUFFER	0
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -93,8 +95,9 @@ extern Timer_t my_timer;
 //
 //extern TIM_HandleTypeDef htim6;
 //extern TIM_HandleTypeDef htim7;
-
-
+#if(TEST_TX_BUFFER)
+volatile UWB_Msg_Header_t  test_buffer = {0, };   //ACK帧，没有内容！
+#endif
 /* USER CODE END 0 */
 
 /**
@@ -217,21 +220,49 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-#if(RANGING_ROLE == ANCHOR)
- 	prepare_beacon(uwb_node.id);
+#if(RUN_PROTOCOL)
+ 	start_run();
 #endif
+
+#if(TEST_TX_BUFFER)
+ 	test_buffer.control = ACK_FRAME_CONTROL;
+ 	test_buffer.dist = 0xFFFF;
+ 	test_buffer.src = uwb_node.id;
+ 	test_buffer.pan_id = uwb_node.pan_id;
+ 	test_buffer.sequence = 0;
+#endif
+
 
  	U_Task u_task = NULL;
  	uint16_t param = 0;
+#if(TEST_TX_BUFFER)
+ 	//JOIN_RESPONSE_LEN
+ 	UWB_Write_Tx_Buffer_in_Addr((uint8_t*)&test_buffer, JOIN_RESPONSE_LEN, TX_BUFFER_1);
+ 	test_buffer.dist = 0x1;
+ 	UWB_Write_Tx_Buffer_in_Addr((uint8_t*)&test_buffer, JOIN_RESPONSE_LEN, TX_BUFFER_2);
+ 	test_buffer.dist = 0x2;
+ 	UWB_Write_Tx_Buffer_in_Addr((uint8_t*)&test_buffer, JOIN_RESPONSE_LEN, TX_BUFFER_3);
+ 	test_buffer.dist = 0x3;
+ 	UWB_Write_Tx_Buffer_in_Addr((uint8_t*)&test_buffer, JOIN_RESPONSE_LEN, TX_BUFFER_4);
+#endif
 
+ 	//尝试写一下了哈
 	while (1) {
-
 		u_task = dequeueTask(&param);
 		if(u_task){
 			u_task(param);
 		}
     /* USER CODE END WHILE */
-
+#if(TEST_TX_BUFFER)
+		HAL_Delay(1000);
+		UWB_StartTx_in_Addr(0, JOIN_RESPONSE_LEN, TX_BUFFER_1);
+		HAL_Delay(1000);
+		UWB_StartTx_in_Addr(0, JOIN_RESPONSE_LEN, TX_BUFFER_2);
+		HAL_Delay(1000);
+		UWB_StartTx_in_Addr(0, JOIN_RESPONSE_LEN, TX_BUFFER_3);
+		HAL_Delay(1000);
+		UWB_StartTx_in_Addr(0, JOIN_RESPONSE_LEN, TX_BUFFER_4);
+#endif
     /* USER CODE BEGIN 3 */
 
 	}

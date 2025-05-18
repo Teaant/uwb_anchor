@@ -64,3 +64,8 @@ int32_t actCM4Interrupt(int32_t n)
 	SemMask=__HAL_HSEM_SEMID_TO_MASK(n);
 	HSEM->C2IER |= SemMask;
 }
+
+void Notify_CM4(int32_t n){
+	actCM4Interrupt(n);
+	genInterrupt(n);
+}

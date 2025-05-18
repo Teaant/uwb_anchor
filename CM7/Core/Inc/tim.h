@@ -32,16 +32,68 @@ extern "C" {
 
 /* USER CODE END Includes */
 
-extern TIM_HandleTypeDef htim2;
+extern TIM_HandleTypeDef htim4;
 
-extern TIM_HandleTypeDef htim3;
+extern TIM_HandleTypeDef htim6;
+
+extern TIM_HandleTypeDef htim15;
 
 /* USER CODE BEGIN Private defines */
+//1MHz
+#define TIMER6_4MS				3999
+#define TIMER6_12MS				11999
+
+#define TIMER6_7MS	6999
+#define TIMER6_8MS	7999
+#define TIMER6_9MS	8999	//BOP 1,3
+#define TIMER6_10MS	9999
+#define TIMER6_11MS	10999
+#define TIMER6_18MS	17999
+
+#define ENABLE_TIMER6()			__HAL_TIM_CLEAR_FLAG(&htim6, TIM_FLAG_UPDATE);\
+								__HAL_TIM_ENABLE(&htim6)
+
+//TIMx->ARR = (uint32_t)Structure->Period;
+#define ENABLE_TIMER6_ARR(period)	__HAL_TIM_CLEAR_FLAG(&htim6, TIM_FLAG_UPDATE);\
+									TIM6->ARR = (period);\
+									__HAL_TIM_ENABLE(&htim6)
+
+
+#define DISABLE_TIMER6()		__HAL_TIM_DISABLE(&htim6);\
+								__HAL_TIM_SET_COUNTER(&htim6, 0)
+
+#define ENABLE_TIMER15()		__HAL_TIM_CLEAR_FLAG(&htim15, TIM_FLAG_UPDATE);\
+								__HAL_TIM_ENABLE(&htim15)
+
+
+
+#define TIMER15_5S				49999
+#define TIMER15_1S				9999
+#define TIMER15_0_8S			7999
+#define TIMER15_0_9S			8999
+
+#define ENABLE_TIMER15_ARR(period)		__HAL_TIM_CLEAR_FLAG(&htim15, TIM_FLAG_UPDATE);\
+										TIM15->ARR = period;\
+										__HAL_TIM_ENABLE(&htim15)
+
+#define DISABLE_TIMER15()		__HAL_TIM_DISABLE(&htim15);\
+								__HAL_TIM_SET_COUNTER(&htim15, 0)
+
+
+#define ENABLE_TIMER4()				__HAL_TIM_CLEAR_FLAG(&htim4, TIM_FLAG_UPDATE);\
+									__HAL_TIM_ENABLE(&htim4)
+
+
+#define DISABLE_TIMER4()		__HAL_TIM_DISABLE(&htim4);\
+								__HAL_TIM_SET_COUNTER(&htim4, 0)
+//那之前的那个，还会这样出现吗？ 就是还是按照之前的值呢？
+
 
 /* USER CODE END Private defines */
 
-void MX_TIM2_Init(void);
-void MX_TIM3_Init(void);
+void MX_TIM4_Init(void);
+void MX_TIM6_Init(void);
+void MX_TIM15_Init(void);
 
 /* USER CODE BEGIN Prototypes */
 

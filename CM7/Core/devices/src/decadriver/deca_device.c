@@ -167,7 +167,7 @@ pdw1000local->otp_mask = config ; // Save the READ_OTP config mask
 	// Read and validate device ID, return -1 if not recognised
 	if (DWT_DEVICE_ID != dwt_readdevid(pports)) // MP IC ONLY (i.e. DW1000) FOR THIS CODE
 	{
-		return DWT_ERROR ;
+		return DWT_ERROR;
 	}
 
 	if(!(DWT_DW_WAKE_UP & config)) // Don't reset the device if DWT_DW_WAKE_UP bit is set, e.g. when calling this API after wake up
@@ -2436,6 +2436,7 @@ void dwt_isr(UWBPortTypeDef *pports)
         // See section "Transmit and automatically wait for response" in DW1000 User Manual
         if((status & SYS_STATUS_AAT) && pdw1000local->wait4resp)   //wait4resp是在tx的时候设置了expect_resp, 但是这个什么SYS_STATUS_AAT不知道是在哪里设置的啊
         {
+        	//不知道是不是这边有做什么，TODO
             dwt_forcetrxoff(pports); // Turn the RX off
             dwt_rxreset(pports); // Reset in case we were late and a frame was already being received
         }

@@ -8,6 +8,10 @@
 #ifndef INC_MODBUS_H_
 #define INC_MODBUS_H_
 
+#define USE_MODBUS 0
+
+#if(USE_MODBUS)
+
 #include <stdint.h>
 
 #include "agent.h"
@@ -47,5 +51,7 @@
 
 
 void parse_modbus_msg(uint8_t* pdata);
+
+#endif
 
 #endif /* INC_MODBUS_H_ */

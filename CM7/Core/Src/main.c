@@ -21,28 +21,21 @@
 #include "dma.h"
 #include "spi.h"
 #include "tim.h"
+#include "usart.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "uwb_mac.h"
-
-#include "task_manager.h"
-
 #include "corecomm.h"
 #include <math.h>
+#include <uwb_mac.h>
 #include "utilities.h"
 #include "aoa.h"
 
 #include "agent.h"
 #include "corecomm.h"
 
-#if(RANGING_ROLE == ANCHOR)
-#include "uwb_mac_anchor.h"
-#else
-#include "uwb_mac_tag.h"
-#endif
-
+#include "task_manager.h"
 
 /* USER CODE END Includes */
 
@@ -60,6 +53,25 @@
 
 #define RUN_PROTOCOL	1
 #define TEST_TX_BUFFER	0
+
+#define TEST_DEMO	0
+
+#if(MY_ROLE == TAG)
+#define USE_WIFI	0
+#else
+#define USE_WIFI	1
+#endif
+
+
+#if(USE_WIFI)
+#define USE_LOG		1
+#endif
+
+#define TEST_ADD_NODE	0
+#if(TEST_ADD_NODE)
+volatile uint32_t test_id = 1;
+volatile uint8_t interval = 1;
+#endif
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -68,14 +80,27 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
-volatile holding_reg_params_t holding_data __attribute__((section(".shared"))) = {0,};
-volatile input_reg_params_t   input_data __attribute__((section(".shared"))) = {0,};
 
 /* USER CODE BEGIN PV */
 
-
 volatile int8_t enableCM4 = 0;
 
+volatile AoADataTypeDef aoa_data[MAX_TAG] __attribute__ ((section(".shared")));
+volatile PDoA_Struct_t pdoa_diags[3] __attribute__ ((section(".shared")));
+
+volatile uint8_t ranging_num __attribute__ ((section(".shared")));
+
+__attribute__((section(".shared"))) volatile uint8_t flag = 0;
+
+__attribute__ ((section(".shared"))) volatile uint8_t rx_fail = 0;
+
+__attribute__ ((section(".shared"))) volatile uint32_t error_status = 0;
+
+__attribute__ ((section(".shared"))) volatile PDoA_Frame_t rxBuffer;
+
+//volatile AoADiagnosticTypeDef aoa_diagnostic[DWT_NUM_DW_DEV] __attribute__ ((section(".shared")));
+
+//volatile float aoa_calibration_table_raw[4][AOA_CALIBRATION_TABLE_LENGTH] __attribute__ ((section(".shared")));
 
 /* USER CODE END PV */
 
@@ -90,14 +115,15 @@ void PeriphCommonClock_Config(void);
 /* USER CODE BEGIN 0 */
 
 extern UWB_Node_t uwb_node;
-extern Timer_t my_timer;
 
-//
-//extern TIM_HandleTypeDef htim6;
-//extern TIM_HandleTypeDef htim7;
-#if(TEST_TX_BUFFER)
-volatile UWB_Msg_Header_t  test_buffer = {0, };   //ACK帧，没有内容！
-#endif
+
+uint8_t is_fail = 0;
+
+
+extern UART_HandleTypeDef huart2;
+
+volatile uint8_t counts = 0;
+
 /* USER CODE END 0 */
 
 /**
@@ -116,10 +142,10 @@ int main(void)
 /* USER CODE BEGIN Boot_Mode_Sequence_1 */
 	/* Wait until CPU2 boots and enters in stop mode or timeout*/
 	timeout = 0xFFFF;
-	while ((__HAL_RCC_GET_FLAG(RCC_FLAG_D2CKRDY) != RESET) && (timeout-- > 0))
-		;
+	while ((__HAL_RCC_GET_FLAG(RCC_FLAG_D2CKRDY) != RESET) && (timeout-- > 0));
 	if (timeout < 0) {
-//		Error_Handler();   //CM4没有准备好，那便算了
+		Error_Handler();
+		is_fail = 1;
 	}
 /* USER CODE END Boot_Mode_Sequence_1 */
   /* MCU Configuration--------------------------------------------------------*/
@@ -128,7 +154,8 @@ int main(void)
   HAL_Init();
 
   /* USER CODE BEGIN Init */
-
+  HAL_Delay(1000);
+	//HAL_PWREx_ConfigSupply(PWR_DIRECT_SMPS_SUPPLY);
   /* USER CODE END Init */
 
   /* Configure the system clock */
@@ -146,123 +173,87 @@ int main(void)
 	/*Release HSEM in order to notify the CPU2(CM4)*/
 	HAL_HSEM_Release(HSEM_ID_0, 0);
 	/* wait until CPU2 wakes up from stop mode */
-	timeout = 0xFFFF;
+	timeout = 0xFFFFF;
 	while ((__HAL_RCC_GET_FLAG(RCC_FLAG_D2CKRDY) == RESET) && (timeout-- > 0))
 		;
 	if (timeout < 0) {
-//		Error_Handler();
+		Error_Handler();
+		is_fail = 1;
 	}
+
 /* USER CODE END Boot_Mode_Sequence_2 */
 
   /* USER CODE BEGIN SysInit */
-
-//	HAL_PWREx_ConfigSupply(PWR_DIRECT_SMPS_SUPPLY);
 
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_DMA_Init();
-  MX_SPI1_Init();
-  MX_SPI2_Init();
-  MX_SPI3_Init();
-  MX_SPI4_Init();
   MX_SPI6_Init();
-  MX_TIM2_Init();
-  MX_TIM3_Init();
+  MX_USART2_UART_Init();
+  MX_TIM15_Init();
+  MX_TIM4_Init();
+  MX_TIM6_Init();
   /* USER CODE BEGIN 2 */
-  HAL_NVIC_DisableIRQ(EXTI0_IRQn);
-  HAL_NVIC_DisableIRQ(EXTI1_IRQn);
-  HAL_NVIC_DisableIRQ(EXTI3_IRQn);
-  HAL_NVIC_DisableIRQ(EXTI4_IRQn);
-  HAL_NVIC_DisableIRQ(EXTI9_5_IRQn);
-  HAL_NVIC_DisableIRQ(EXTI15_10_IRQn);
 
-  /**
-   * Tanya_edit: no need right now
-   */
-//   bufferInit();
+#if(!TEST_DEMO)
 
-   initNode(RANGING_ROLE, &htim2);
 
-   HAL_TIM_Base_Start(&htim3);
+	HAL_NVIC_DisableIRQ(EXTI15_10_IRQn);
 
-#if(RANGING_ROLE == TAG)
+	initNode();
 
-   HAL_TIM_OC_Start(&htim2, TIM_CHANNEL_2);
-   HAL_TIM_OC_Start(&htim2, TIM_CHANNEL_3);
-   HAL_TIM_OC_Start(&htim2, TIM_CHANNEL_4);
+	for (int i = 0; i < DWT_NUM_DW_DEV; i++) {
+		if (uwb_node.device->ports[i].avalible == 1) {
+			/* Set expected response's delay and timeout. See NOTE 4, 5 and 6 below.
+			 * As this example only handles one incoming frame with always the same delay and timeout, those values can be set here once for all. */
+#if(USE_LOG)
+			printf("DW1000 init successful.\r\n");
+#endif
+			dwt_setrxaftertxdelay(0,  &uwb_node.device->ports[i]);
+			dwt_setrxtimeout(0, &uwb_node.device->ports[i]);
+			HAL_NVIC_ClearPendingIRQ(uwb_node.device->ports[i].exti_line);
+			HAL_NVIC_EnableIRQ(uwb_node.device->ports[i].exti_line);
+//			if(i == 0)
+//			dwt_rxenable(DWT_START_RX_IMMEDIATE, &uwb_node.device->ports[i]);  //也并不需要
+		}
+	}
 
-#else
-   HAL_TIM_OC_Start(&htim2, TIM_CHANNEL_1);
-   HAL_TIM_OC_Start(&htim2, TIM_CHANNEL_2);
-   HAL_TIM_OC_Start(&htim2, TIM_CHANNEL_3);
-   HAL_TIM_OC_Start(&htim2, TIM_CHANNEL_4);
+#if(USE_WIFI)
+	//Configure WiFi
+	HAL_GPIO_WritePin(WIFI_EN_GPIO_Port, WIFI_EN_Pin, GPIO_PIN_RESET);
+
+	HAL_Delay(100);
+	//使能ESP32
+	HAL_GPIO_WritePin(WIFI_EN_GPIO_Port, WIFI_EN_Pin, GPIO_PIN_SET);
+
+	HAL_Delay(500);
+	Connect_Wifi();
 
 #endif
 
- 	for(int i=0;i<DWT_NUM_DW_DEV;i++)
- 	{
- 		if(uwb_node.device->ports[i].avalible == 1)
- 		{
- 		    /* Set expected response's delay and timeout. See NOTE 4, 5 and 6 below.
- 		     * As this example only handles one incoming frame with always the same delay and timeout, those values can be set here once for all. */
-// 			dwt_setrxaftertxdelay(0, pports);  //若是不设置呢，我希望在代码中设置的，若是不进入rx我希�???
- 			dwt_setrxtimeout(0, &uwb_node.device->ports[i]);
- 			HAL_NVIC_ClearPendingIRQ(uwb_node.device->ports[i].exti_line);
- 			HAL_NVIC_EnableIRQ(uwb_node.device->ports[i].exti_line);
- 		}
- 	}
-
-// 	HAL_GPIO_WritePin(GPIOE, GPIO_PIN_9, GPIO_PIN_SET);  //This is to do what�??  to synchronize the PDoA board
+#endif
 
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-#if(RUN_PROTOCOL)
- 	start_run();
-#endif
+//	ENABLE_TIMER2();  // 1000000
+//	//32 bit 是 4294967295
+	start_run();
 
-#if(TEST_TX_BUFFER)
- 	test_buffer.control = ACK_FRAME_CONTROL;
- 	test_buffer.dist = 0xFFFF;
- 	test_buffer.src = uwb_node.id;
- 	test_buffer.pan_id = uwb_node.pan_id;
- 	test_buffer.sequence = 0;
-#endif
+	U_Task u_task = NULL;
+	uint16_t param = 0;
 
-
- 	U_Task u_task = NULL;
- 	uint16_t param = 0;
-#if(TEST_TX_BUFFER)
- 	//JOIN_RESPONSE_LEN
- 	UWB_Write_Tx_Buffer_in_Addr((uint8_t*)&test_buffer, JOIN_RESPONSE_LEN, TX_BUFFER_1);
- 	test_buffer.dist = 0x1;
- 	UWB_Write_Tx_Buffer_in_Addr((uint8_t*)&test_buffer, JOIN_RESPONSE_LEN, TX_BUFFER_2);
- 	test_buffer.dist = 0x2;
- 	UWB_Write_Tx_Buffer_in_Addr((uint8_t*)&test_buffer, JOIN_RESPONSE_LEN, TX_BUFFER_3);
- 	test_buffer.dist = 0x3;
- 	UWB_Write_Tx_Buffer_in_Addr((uint8_t*)&test_buffer, JOIN_RESPONSE_LEN, TX_BUFFER_4);
-#endif
-
- 	//尝试写一下了哈
 	while (1) {
 		u_task = dequeueTask(&param);
-		if(u_task){
+		if (u_task) {
 			u_task(param);
 		}
+
     /* USER CODE END WHILE */
-#if(TEST_TX_BUFFER)
-		HAL_Delay(1000);
-		UWB_StartTx_in_Addr(0, JOIN_RESPONSE_LEN, TX_BUFFER_1);
-		HAL_Delay(1000);
-		UWB_StartTx_in_Addr(0, JOIN_RESPONSE_LEN, TX_BUFFER_2);
-		HAL_Delay(1000);
-		UWB_StartTx_in_Addr(0, JOIN_RESPONSE_LEN, TX_BUFFER_3);
-		HAL_Delay(1000);
-		UWB_StartTx_in_Addr(0, JOIN_RESPONSE_LEN, TX_BUFFER_4);
-#endif
+
     /* USER CODE BEGIN 3 */
 
 	}
@@ -288,11 +279,6 @@ void SystemClock_Config(void)
 
   while(!__HAL_PWR_GET_FLAG(PWR_FLAG_VOSRDY)) {}
 
-  __HAL_RCC_SYSCFG_CLK_ENABLE();
-  __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE0);
-
-  while(!__HAL_PWR_GET_FLAG(PWR_FLAG_VOSRDY)) {}
-
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
@@ -302,7 +288,7 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
   RCC_OscInitStruct.PLL.PLLM = 4;
-  RCC_OscInitStruct.PLL.PLLN = 60;
+  RCC_OscInitStruct.PLL.PLLN = 50;
   RCC_OscInitStruct.PLL.PLLP = 2;
   RCC_OscInitStruct.PLL.PLLQ = 2;
   RCC_OscInitStruct.PLL.PLLR = 2;
@@ -327,7 +313,7 @@ void SystemClock_Config(void)
   RCC_ClkInitStruct.APB2CLKDivider = RCC_APB2_DIV2;
   RCC_ClkInitStruct.APB4CLKDivider = RCC_APB4_DIV2;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_4) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
   {
     Error_Handler();
   }
@@ -343,19 +329,16 @@ void PeriphCommonClock_Config(void)
 
   /** Initializes the peripherals clock
   */
-  PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_SPI6|RCC_PERIPHCLK_SPI3
-                              |RCC_PERIPHCLK_SPI2|RCC_PERIPHCLK_SPI1
-                              |RCC_PERIPHCLK_SPI4;
+  PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_SPI6|RCC_PERIPHCLK_SPI1;
   PeriphClkInitStruct.PLL2.PLL2M = 4;
-  PeriphClkInitStruct.PLL2.PLL2N = 32;
-  PeriphClkInitStruct.PLL2.PLL2P = 8;
-  PeriphClkInitStruct.PLL2.PLL2Q = 8;
+  PeriphClkInitStruct.PLL2.PLL2N = 10;
+  PeriphClkInitStruct.PLL2.PLL2P = 2;
+  PeriphClkInitStruct.PLL2.PLL2Q = 2;
   PeriphClkInitStruct.PLL2.PLL2R = 2;
   PeriphClkInitStruct.PLL2.PLL2RGE = RCC_PLL2VCIRANGE_3;
-  PeriphClkInitStruct.PLL2.PLL2VCOSEL = RCC_PLL2VCOWIDE;
+  PeriphClkInitStruct.PLL2.PLL2VCOSEL = RCC_PLL2VCOMEDIUM;
   PeriphClkInitStruct.PLL2.PLL2FRACN = 0;
   PeriphClkInitStruct.Spi123ClockSelection = RCC_SPI123CLKSOURCE_PLL2;
-  PeriphClkInitStruct.Spi45ClockSelection = RCC_SPI45CLKSOURCE_PLL2;
   PeriphClkInitStruct.Spi6ClockSelection = RCC_SPI6CLKSOURCE_PLL2;
   if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
   {
@@ -364,67 +347,7 @@ void PeriphCommonClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
-/**
- *  TIMx->CCR2 = OC_Config->Pulse;   rw/r 是什么意思？
- */
-//要�?�虑各种的这边的状�?�之类的嘛？
-void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim){
 
-#if(RANGING_ROLE == TAG)
-	if(htim->Channel == HAL_TIM_ACTIVE_CHANNEL_2){
-		if(my_timer.callback){
-			my_timer.callback();
-		}
-	}
-	if (htim->Channel == HAL_TIM_ACTIVE_CHANNEL_3) {
-#if(Tanya_Test_Timer)
-		HAL_GPIO_TogglePin(LED3_GPIO_Port, LED3_Pin);
-		Reset_Timer();   //�??�?
-		Tag_Set_Compare(40, test_callback);
-#else
-		//休眠
-		DISABLE_COMP3(htim);
-		HAL_GPIO_TogglePin(LED3_GPIO_Port, LED3_Pin);
-		tag_wakeup_radio();
-#endif
-
-	}
-	if (htim->Channel == HAL_TIM_ACTIVE_CHANNEL_4) {
-
-		DISABLE_COMP4(htim);
-		HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
-		/**
-		 * @TODO  长时间未收到锚节点的beacon
-		 */
-		Tag_lose_anchor();
-	}
-#else
-
-	if(htim->Channel == HAL_TIM_ACTIVE_CHANNEL_1){
-		if(my_timer.callback){
-			HAL_GPIO_TogglePin(LED3_GPIO_Port, LED1_Pin);
-			my_timer.callback();
-		}
-	}
-	if(htim->Channel == HAL_TIM_ACTIVE_CHANNEL_2){
-			if(my_timer.callback1){
-				my_timer.callback1(my_timer.param1);
-			}
-		}
-	if(htim->Channel == HAL_TIM_ACTIVE_CHANNEL_3){
-			if(my_timer.callback2){
-				my_timer.callback2(my_timer.param2);
-			}
-		}
-	if(htim->Channel == HAL_TIM_ACTIVE_CHANNEL_4){
-			if(my_timer.callback3){
-				my_timer.callback3(my_timer.param3);
-			}
-		}
-
-#endif
-
-}
 /* USER CODE END 4 */
 
 /**
@@ -444,12 +367,36 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     HAL_IncTick();
   }
   /* USER CODE BEGIN Callback 1 */
-//  if (htim->Instance == TIM2) {
-////	  Inc_Uwb_Tick();
-//	  //�???????????要restart?
-//
-//	  //zaiguancha
-//   }
+  //Resp消息相关定时器
+	if (htim->Instance == TIM6) {
+		DISABLE_TIMER6();
+#if(MY_ROLE == TAG)
+		uwb_node.ptag_struct->timer6_callback();
+#else
+		timer6_callback();
+#endif   // MY_ROLE
+
+	}
+
+	if(htim->Instance == TIM15){
+		DISABLE_TIMER15();
+
+#if(MY_ROLE == TAG)
+		//wake up the tag ~
+		uwb_node.ptag_struct->timer15_callback();
+#else    // ANCHOR
+		timer15_callback();
+
+#endif
+	}
+
+#if(MY_ROLE == TAG)
+	if(htim->Instance == TIM4){
+		//anchor_absence
+		Tag_lose_anchor();
+	}
+#endif
+
   /* USER CODE END Callback 1 */
 }
 

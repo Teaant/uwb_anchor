@@ -18,11 +18,6 @@ typedef enum{
 	expect = 1,
 }If_Expected_t;
 
-typedef enum{
-	anchor =1,
-	tag =2,
-}UWB_Role_t;
-//我大概知道了这个enum其实就是说是一个数字常量，如我们所见到的那些一样
 #define ANCHOR	1
 #define TAG		2
 

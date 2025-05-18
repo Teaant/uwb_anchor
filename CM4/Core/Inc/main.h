@@ -57,8 +57,28 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
-#define WIFI_EN_Pin GPIO_PIN_4
-#define WIFI_EN_GPIO_Port GPIOC
+#define UWB1A_IRQ_Pin GPIO_PIN_0
+#define UWB1A_IRQ_GPIO_Port GPIOA
+#define UWB1B_IRQ_Pin GPIO_PIN_1
+#define UWB1B_IRQ_GPIO_Port GPIOA
+#define UWB1A_SPICSn_Pin GPIO_PIN_4
+#define UWB1A_SPICSn_GPIO_Port GPIOA
+#define UWB1_SPICLK_Pin GPIO_PIN_5
+#define UWB1_SPICLK_GPIO_Port GPIOA
+#define UWB1_SPIMISO_Pin GPIO_PIN_6
+#define UWB1_SPIMISO_GPIO_Port GPIOA
+#define UWB1_SPIMOSI_Pin GPIO_PIN_7
+#define UWB1_SPIMOSI_GPIO_Port GPIOA
+#define UWB1_WAKEUP_Pin GPIO_PIN_5
+#define UWB1_WAKEUP_GPIO_Port GPIOC
+#define UWB1B_SPICSn_Pin GPIO_PIN_0
+#define UWB1B_SPICSn_GPIO_Port GPIOB
+#define UWB1A_RSTn_Pin GPIO_PIN_1
+#define UWB1A_RSTn_GPIO_Port GPIOB
+#define UWB1B_RSTn_Pin GPIO_PIN_2
+#define UWB1B_RSTn_GPIO_Port GPIOB
+#define SYNC_ENABLE_Pin GPIO_PIN_12
+#define SYNC_ENABLE_GPIO_Port GPIOE
 #define LED2_Pin GPIO_PIN_14
 #define LED2_GPIO_Port GPIOD
 

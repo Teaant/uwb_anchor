@@ -107,8 +107,7 @@ int readfromspi(uint16_t headerLength,
 //    {
 //        HAL_SPI_Transmit(&hspi6, (uint8_t *)&headerBuffer[i], 1, HAL_MAX_DELAY);//No timeout
 //    }
-
-    HAL_SPI_Receive(pports->hspi, (uint8_t *)readBuffer, readlength, HAL_MAX_DELAY);
+//    HAL_SPI_Receive(pports->hspi, (uint8_t *)readBuffer, readlength, HAL_MAX_DELAY);
     /* for the data buffer use LL functions directly as the HAL SPI read function
      * has issue reading single bytes */
 //    while(readlength > 0)
@@ -134,7 +133,11 @@ int readfromspi(uint16_t headerLength,
 //        readBuffer++;
 ////        (*readBuffer++) = hspi6.Instance->RXDR;  //copy data read form (MISO)
 //    }
-//    HAL_SPI_TransmitReceive(&hspi6,(uint8_t *)headerBuffer,(uint8_t *)readBuffer,headerLength,headerLength*100);
+    uint8_t dummy[readlength];
+    memset(dummy, 0, readlength);
+    HAL_SPI_TransmitReceive(pports->hspi, dummy, readBuffer, readlength, HAL_MAX_DELAY);
+
+//    HAL_SPI_TransmitReceive(pports->hspi,(uint8_t *)headerBuffer,(uint8_t *)readBuffer,headerLength,headerLength*100);
 
     HAL_GPIO_WritePin(pports->spi_csn_port, pports->spi_csn_pin, GPIO_PIN_SET); /**< Put chip select line high */
 

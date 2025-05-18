@@ -3,17 +3,28 @@
 
 
 # include "main.h"
+#include "deca_device_api.h"
 
 #define ANCHOR 	1
 #define TAG		2
 
 #define MY_ROLE		ANCHOR
 
+#define 	PAN_ID				(0x3737)
+
+#if(MY_ROLE == ANCHOR)
+#define 	MY_ID				(0xAAAA)
+#else
+#define 	MY_ID				(0xCC22)
+#endif
+
+
+#define INTERVAL		(2)
 //保留过去N组位移和距离信息
 //那么线性方程组矩阵有N-1阶
 # define N 50
 
-#define	MAX_NODE	51
+#define	MAX_NODE	48
 
 //设置UWB测距时平均值滤波的采样数，应考虑系统的实时性
 //目前leader每50ms进行一次poll可以正常运行，每个个体1秒钟左右进行一次坐标更新
@@ -68,8 +79,35 @@ typedef struct
 } holding_reg_params_t;
 
 #pragma pack(pop)
-//Tanya_end
 
+
+typedef struct{
+
+	uint8_t avalible;
+	uint8_t rcphase;
+	uint16_t fp_index;
+	uint32_t fp_amp_sum;
+	float fp_angle;
+
+	float phi;
+	float beta;
+
+	dwt_rxdiag_t tempDiag;
+
+}AoADiagnosticTypeDef;
+/**
+ * 	UWB.aoa_param[my_dw_id].phi = fp_angle;
+	UWB.aoa_param[my_dw_id].beta = (float) rcphase / 64.0 * PI;
+	UWB.aoa_param[my_dw_id].avalible = 1;
+	UWB.aoa_param[my_dw_id].src_car_id = src_car_id;
+ */
+
+typedef struct{
+	uint8_t is_used;
+	uint16_t src_id;
+	AoADiagnosticTypeDef Diag[2];
+}PDoA_Struct_t;
+//Tanya_end
 
 
 typedef struct{
@@ -135,8 +173,6 @@ float distance_compensate(float distance);
 
 //对测距结果进行滑动滤波
 void sliding_filter(float *distance);
-
-
 
 //CM7
 void StartAgentListUpdateTask(void *arg);

@@ -1,38 +1,41 @@
 /* USER CODE BEGIN Header */
 /**
-  ******************************************************************************
-  * @file           : main.c
-  * @brief          : Main program body
-  ******************************************************************************
-  * @attention
-  *
-  * Copyright (c) 2024 STMicroelectronics.
-  * All rights reserved.
-  *
-  * This software is licensed under terms that can be found in the LICENSE file
-  * in the root directory of this software component.
-  * If no LICENSE file comes with this software, it is provided AS-IS.
-  *
-  ******************************************************************************
-  */
+ ******************************************************************************
+ * @file           : main.c
+ * @brief          : Main program body
+ ******************************************************************************
+ * @attention
+ *
+ * Copyright (c) 2024 STMicroelectronics.
+ * All rights reserved.
+ *
+ * This software is licensed under terms that can be found in the LICENSE file
+ * in the root directory of this software component.
+ * If no LICENSE file comes with this software, it is provided AS-IS.
+ *
+ ******************************************************************************
+ */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "cmsis_os.h"
-#include "crc.h"
 #include "dma.h"
-#include "usart.h"
-#include "gpio.h"
+#include "spi.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "gpio.h"
 #include <math.h>
 
 #include "aoa.h"
 
 #include "agent.h"
 #include "corecomm.h"
+
+#include "uwb.h"
+
+#include "uwb_msg.h"
+
+#include "task_manager.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -57,23 +60,29 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-volatile holding_reg_params_t holding_data_share __attribute__((section(".shared"))) = {0,};
-volatile input_reg_params_t   input_data_share __attribute__((section(".shared"))) = {0,};
+volatile AoADataTypeDef aoa_data[MAX_TAG] __attribute__ ((section(".shared")));
+volatile PDoA_Struct_t pdoa_diags[3] __attribute__ ((section(".shared")));
 
-extern holding_reg_params_t hold_data ;
-extern input_reg_params_t input_data;
+volatile uint8_t ranging_num __attribute__ ((section(".shared")));
 
+__attribute__((section(".shared"))) volatile uint8_t flag = 0;
+
+__attribute__ ((section(".shared"))) volatile uint8_t rx_fail = 0;
+
+__attribute__ ((section(".shared"))) volatile uint32_t error_status = 0;
+
+__attribute__ ((section(".shared"))) volatile PDoA_Frame_t rxBuffer;
+
+extern UWBDef UWB;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
-void MX_FREERTOS_Init(void);
 /* USER CODE BEGIN PFP */
-#define DWT_NUM_DW_DEV   9
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
 
 /* USER CODE END 0 */
 
@@ -88,18 +97,19 @@ int main(void)
   /* USER CODE END 1 */
 
 /* USER CODE BEGIN Boot_Mode_Sequence_1 */
-  /*HW semaphore Clock enable*/
-  __HAL_RCC_HSEM_CLK_ENABLE();
-  /* Activate HSEM notification for Cortex-M4*/
-  HAL_HSEM_ActivateNotification(__HAL_HSEM_SEMID_TO_MASK(HSEM_ID_0));
-  /*
-  Domain D2 goes to STOP mode (Cortex-M4 in deep-sleep) waiting for Cortex-M7 to
-  perform system initialization (system clock config, external memory configuration.. )
-  */
-  HAL_PWREx_ClearPendingEvent();
-  HAL_PWREx_EnterSTOPMode(PWR_MAINREGULATOR_ON, PWR_STOPENTRY_WFE, PWR_D2_DOMAIN);
-  /* Clear HSEM flag */
-  __HAL_HSEM_CLEAR_FLAG(__HAL_HSEM_SEMID_TO_MASK(HSEM_ID_0));
+	/*HW semaphore Clock enable*/
+	__HAL_RCC_HSEM_CLK_ENABLE();
+//	/* Activate HSEM notification for Cortex-M4*/
+	HAL_HSEM_ActivateNotification(__HAL_HSEM_SEMID_TO_MASK(HSEM_ID_0));
+	/*
+	 Domain D2 goes to STOP mode (Cortex-M4 in deep-sleep) waiting for Cortex-M7 to
+	 perform system initialization (system clock config, external memory configuration.. )
+	 */
+	HAL_PWREx_ClearPendingEvent();
+	HAL_PWREx_EnterSTOPMode(PWR_MAINREGULATOR_ON, PWR_STOPENTRY_WFE,
+			PWR_D2_DOMAIN);
+	/* Clear HSEM flag */
+	__HAL_HSEM_CLEAR_FLAG(__HAL_HSEM_SEMID_TO_MASK(HSEM_ID_0));
 
 /* USER CODE END Boot_Mode_Sequence_1 */
   /* MCU Configuration--------------------------------------------------------*/
@@ -108,7 +118,7 @@ int main(void)
   HAL_Init();
 
   /* USER CODE BEGIN Init */
-
+  HAL_Delay(5000);
   /* USER CODE END Init */
 
   /* USER CODE BEGIN SysInit */
@@ -116,60 +126,64 @@ int main(void)
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
-  MX_GPIO_Init();
   MX_DMA_Init();
-  MX_USART2_UART_Init();
-  MX_CRC_Init();
+  MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
-  bufferInit();
-//  connect_wifi();
-  HAL_GPIO_WritePin(WIFI_EN_GPIO_Port, WIFI_EN_Pin, GPIO_PIN_RESET);
-//
-//  	HAL_Delay(1000);
-//  	HAL_GPIO_WritePin(WIFI_EN_GPIO_Port, WIFI_EN_Pin, GPIO_PIN_SET);
 
-  	HAL_Delay(2000);
-#if(MY_ROLE == ANCHOR)
-  //使能ESP32
-  HAL_GPIO_WritePin(WIFI_EN_GPIO_Port, WIFI_EN_Pin, GPIO_PIN_SET);
-#endif
+  MX_GPIO_Init();
+
   /* USER CODE END 2 */
 
-  /* Call init function for freertos objects (in freertos.c) */
-  MX_FREERTOS_Init();
-
-  /* Start scheduler */
-  osKernelStart();
-
-  /* We should never get here as control is now taken by the scheduler */
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+	HAL_NVIC_DisableIRQ(EXTI0_IRQn);
+	HAL_NVIC_DisableIRQ(EXTI1_IRQn);
 
-  while (1)
-  {
-	  HAL_Delay(500);
+	uwbInit(0);
+
+	for (int i = 1; i < DWT_NUM_DW_DEV; i++) {
+		if (UWB.ports[i].avalible == 1) {
+			dwt_setrxaftertxdelay(0, &UWB.ports[i]);
+			dwt_setrxtimeout(0, &UWB.ports[i]);
+			HAL_NVIC_ClearPendingIRQ(UWB.ports[i].exti_line);
+			HAL_NVIC_EnableIRQ(UWB.ports[i].exti_line);
+		}
+	}
+
+  HAL_GPIO_WritePin(GPIOE, GPIO_PIN_9, GPIO_PIN_SET); //This is to do what�??  to synchronize the PDoA board
+
+  U_Task u_task = NULL;
+  uint16_t para = 0;
+	while (1) {
+		u_task = dequeueTask(&para);
+		if(u_task){
+			u_task(para);
+		}
 
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
 //	  HAL_UART_Transmit(&huart2, (uint8_t*) "AT+RST\r\n", 10, 200);
-  }
+	}
   /* USER CODE END 3 */
 }
 
 /* USER CODE BEGIN 4 */
-void HAL_HSEM_FreeCallback(uint32_t SemMask){
-//__HAL_HSEM_SEMID_TO_MASK
-	switch(SemMask){
-	case __HAL_HSEM_SEMID_TO_MASK(RANGING_DATA_724_3):
-		//memcpy吧直接
-		memcpy((uint8_t*)&input_data, (uint8_t*)&input_data_share,  6 + input_data_share.node_num * 10);   //不会是之后的问题吧？
-		break;
-	case __HAL_HSEM_SEMID_TO_MASK(NEW_TAG_724_2):
-		break;
-	default:
-		break;
+void HAL_HSEM_FreeCallback(uint32_t statusreg){
+
+	if(__HAL_HSEM_SEMID_TO_MASK(Enable_PDoA) & statusreg){
+		enable_pdoa();
+		HAL_GPIO_TogglePin(LED2_GPIO_Port, LED2_Pin);
 	}
+	if(__HAL_HSEM_SEMID_TO_MASK(Disable_PDoA) & statusreg){
+		disable_pdoa();
+	}
+
+	if (__HAL_HSEM_SEMID_TO_MASK(Process_PDoA) & statusreg) {
+		disable_pdoa();
+		enqueueTask(process_pdoa, 0);
+	}
+
 }
 /* USER CODE END 4 */
 
@@ -190,7 +204,15 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     HAL_IncTick();
   }
   /* USER CODE BEGIN Callback 1 */
-
+	//按照所说的，还是不要在中断当中进行这边的计算了好吧 ~
+//	if (htim->Instance == TIM7) {
+//		/**
+//		 * 计算的power最大在-170左右，相邻的相差大约20 ~
+//		 */
+//		HAL_TIM_Base_Stop_IT(&htim7);
+//		enqueueTask(process_pdoa, 0);
+//
+//	}
   /* USER CODE END Callback 1 */
 }
 
@@ -201,11 +223,10 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
-  /* User can add his own implementation to report the HAL error return state */
-  __disable_irq();
-  while (1)
-  {
-  }
+	/* User can add his own implementation to report the HAL error return state */
+	__disable_irq();
+	while (1) {
+	}
   /* USER CODE END Error_Handler_Debug */
 }
 

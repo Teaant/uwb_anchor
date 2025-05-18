@@ -1,0 +1,15 @@
+角色：
+	地面锚节点（STM32H7），空中标签（STM32F4）
+
+流程：
+	1. 配对 （MAC_CMD frame ACK frame）
+	2. 定期测距以及输出（PDoA板在接收到之后关闭中断线的，直接查看定时器的状态即可的）
+	TIM7：计算角度		  5ms  enough ?
+	TIM3：重新失能EXTI线  50ms
+	3. 交接（当目标到达一定的范围内之后，停止【评价是否满足一定的指标】并移交给其他控制）
+
+数据：
+	调试：
+	//实际上tag_id应该始终是相同的一个的
+	tag_id,  distance
+	pdoa_id, power, theta(先不校准）

@@ -68,7 +68,7 @@ typedef signed long int32;
  * @TODO  DWT设备数目3或者增加PDoA板数目
  */
 #ifndef DWT_NUM_DW_DEV
-#define DWT_NUM_DW_DEV (3)
+#define DWT_NUM_DW_DEV (1)
 #endif
 
 #define DWT_SUCCESS (0)

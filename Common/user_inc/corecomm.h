@@ -31,6 +31,14 @@
 
 #define	NEW_CONFIG_427_4	4
 
+enum Hsem_enum{
+
+	Enable_PDoA = 5,
+	Disable_PDoA,
+	Process_PDoA,
+
+};
+
 typedef int32_t (*writeBuffer_t) (void*,int);
 typedef int32_t (*readBuffer_t) (void*,int);
 typedef int32_t (*genInterrupt_t) (int32_t);
@@ -61,30 +69,17 @@ typedef struct
 
 typedef struct{
 	float phase;
+	float phase_m;
 	float theta;
 	float alpha;
 	float normalized_amp;
 	float raw_amp;
+	float power;
 	uint16_t src_car_id;
 	uint8_t avalible;
 }AoADataTypeDef;
 
-typedef struct{
-	uint8_t my_dw_id;
-	uint8_t rcphase;
-	uint32_t rx_ts;
-	float fp_angle;
-	uint16_t fp_index;
-	uint16_t fp_amp1;
-	uint16_t fp_amp2;
-	uint16_t fp_amp3;
-	uint32_t fp_amp_sum;
-	uint16_t std_noise;
-	uint8_t avalible;
-	uint16_t rxpacc;
-	uint16_t rxpacc_nosat;
-	uint16_t cir_pwr;
-}AoADiagnosticTypeDef;
+
 
 int32_t bufferInit();
 int32_t writeBuffer(void*, int);
@@ -93,5 +88,7 @@ int32_t genInterrupt(int32_t);
 int32_t actInterrupt(int32_t);
 int32_t actCM7Interrupt(int32_t n);
 int32_t actCM4Interrupt(int32_t n);
+
+void Notify_CM4(int32_t n);
 
 #endif

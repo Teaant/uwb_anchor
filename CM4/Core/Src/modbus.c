@@ -11,6 +11,8 @@
 
 #include "corecomm.h"
 
+#if(USE_MODBUS)
+
 extern volatile holding_reg_params_t holding_data_share __attribute__((section(".shared")));
 
 volatile holding_reg_params_t hold_data = {0,};
@@ -28,7 +30,7 @@ uint8_t 	mbs_send_buff[ModbusMaxSize];
 uint8_t*	p_parse = NULL;
 uint8_t* 	p_send = mbs_send_buff;
 
-extern UART_HandleTypeDef huart2;
+//extern UART_HandleTypeDef huart2;
 extern CRC_HandleTypeDef hcrc;
 //更改寄存器字节序
 //输入：p_reg寄存器首地址，num寄存器数量
@@ -215,7 +217,7 @@ void MB_Send(uint8_t *_pBuf, uint8_t length){
 //
 //	if(osSemaphoreAcquire(ESP32IdleSem, osWaitForever) == osOK)
 //	{
-		HAL_UART_Transmit_DMA(&huart2, _pBuf, length);
+//		HAL_UART_Transmit_DMA(&huart2, _pBuf, length);
 		//HAL_UART_Transmit(&huart2, _pBuf, length, 100);
 //		osSemaphoreRelease(ESP32IdleSem);
 //	}
@@ -234,6 +236,7 @@ static uint8_t* change_reg_byte_order(uint8_t *p_reg, uint8_t num){
 	return p_head;
 }
 
+#endif
 
 
 

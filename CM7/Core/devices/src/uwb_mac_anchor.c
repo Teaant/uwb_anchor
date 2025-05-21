@@ -24,6 +24,13 @@
 #define TEST_RESP 	0
 #define DO_RESP		1
 
+#define LOG_SLOT	2
+#define LOG_DATA	3
+
+#define LOG_WHAT	LOG_SLOT
+
+
+
 
 extern volatile UWB_Node_t uwb_node;
 
@@ -42,6 +49,9 @@ volatile  uint8_t ranging_groups = 0;
 volatile UWB_RangingValue_t  ranging_tags_value[MAX_TAG];
 
 
+static void anchor_master(uint16_t, uint16_t, const UWB_Sync_Header_t*, uint64_t);
+
+static uint8_t anchor_slave(uint16_t, uint16_t, const UWB_Sync_Header_t*, uint64_t);
 
 static slot_alloc_node_t* find_tag_in_table(uint16_t id);
 static void add_new_tag(uint16_t id, uint8_t interval);
@@ -57,6 +67,7 @@ volatile Anchor_Struct_t anchor_struct = {
 		.ref_id = MY_ID,
 		.level = 0,
 		.master_slot = 0,
+		.neighbor_num = 0,
 		.my_slot = 0,
 		.Slots = {MY_ID, 0xFFFF, 0xFFFF, 0xFFFF},
 #else
@@ -103,7 +114,7 @@ void Anchor_start_run(void){
 }
 
 
-
+//大抵暂时是没说那么特别大的问题
 void anchor_parse_ranging(uint16_t microSlot){
 
 	UWB_Rcv_Msg_t* pmsg = get_msg_from_queue();
@@ -125,7 +136,13 @@ void anchor_parse_ranging(uint16_t microSlot){
 		enable_rx_with_timeout(0);
 #endif
 #if(ENABLE_SYNC)
-
+		UWB_Sync_Header_t* sync_header = (UWB_Sync_Header_t*)(pmsg->rcv_data + UWB_MAC_HEADER_LEN);
+		if(sync_header->ref_id < anchor_struct.ref_id || (sync_header->ref_id == anchor_struct.ref_id && sync_header->level < anchor_struct.level)){
+			anchor_master(pheader->src, pheader->pan_id, sync_header, pmsg->rx_ts);
+		}
+		else if(sync_header->ref_id > anchor_struct.ref_id || (sync_header->ref_id == anchor_struct.ref_id && sync_header->level > anchor_struct.level)){
+			anchor_slave(pheader->src, pheader->pan_id, sync_header, pmsg->rx_ts);
+		}
 #endif
 		break;
 	case data_frame:
@@ -259,8 +276,10 @@ void beacon_txdone_cb(uint64_t tx_ts){
 	}
 
 #if(ENABLE_SYNC)
+	anchor_struct.anchor_times.Tx_Beacon = tx_ts;
 	anchor_struct.anchor_times.Start_Beacon = getDeltaT(tx_ts, (MS_2 *(anchor_struct.my_slot&0x01)));   //好像是这样的了~
 #else
+	anchor_struct.anchor_times.Tx_Beacon = tx_ts;
 	anchor_struct.anchor_times.Start_Beacon = tx_ts;
 #endif
 	anchor_struct.anchor_times.Next_Beacon = getSumT(tx_ts, S_TO_DWT_TIME);
@@ -408,9 +427,21 @@ void prepare_beacon(uint16_t id){
 	}
 
 #if(ENABLE_SYNC)
+#if(USE_LOG)
+	printf("schedule a beacon with ref_id = 0x%x, level = %d, slot = %d.\r\n", anchor_struct.ref_id,
+			anchor_struct.level,anchor_struct.my_slot);
+#endif
 	pbeacon->sync_header.ref_id = uwb_node.panchor_struct->ref_id;
 	pbeacon->sync_header.level = uwb_node.panchor_struct->level;
 	memcpy((uint8_t*)(pbeacon->sync_header.Slots), (uint8_t*)(anchor_struct.Slots), 4 * sizeof(uint16_t));
+
+#if(LOG_WHAT == LOG_SLOT)
+	//ref_id, my_slot, my_level, Slots
+	printf("%d,%d,%d,%d,%d,%d,%d\r\n", anchor_struct.ref_id, anchor_struct.my_slot, anchor_struct.level,
+			anchor_struct.Slots[0], anchor_struct.Slots[1],
+			anchor_struct.Slots[2], anchor_struct.Slots[3]);
+#endif
+
 #endif
 
 	//先更新一下标签表
@@ -443,14 +474,12 @@ void prepare_beacon(uint16_t id){
 		}
 		p = p->pnext;
 	}
+
+
 	pbeacon->payload.Ntags = ranging_num;
 	ranging_groups = ranging_num/3 + (((ranging_num%3)!=0)?1:0);
 
 	pbeacon->payload.sCAP = 2 + ranging_groups * 9 ; //micro_slot_start ~
-
-//	if(ranging_num == 0){
-////		Notify_CM4(Disable_PDoA);
-//	}
 
 	UWB_Schedule_Beacon_Frame((uint8_t*)pbeacon, BEACON_COMMON_LEN + ranging_num * 2, anchor_struct.anchor_times.Next_Beacon, ranging_num, anchor_struct.my_slot);
 
@@ -485,10 +514,15 @@ void issue_beacon(uint16_t id){
 #if(ENABLE_SYNC)
 	pbeacon->sync_header.ref_id = uwb_node.panchor_struct->ref_id;
 	pbeacon->sync_header.level = uwb_node.panchor_struct->level;
-	pbeacon->sync_header.bop_0 = uwb_node.panchor_struct->Slots[0];
-	pbeacon->sync_header.bop_1 = uwb_node.panchor_struct->Slots[1];
-	pbeacon->sync_header.bop_2 = uwb_node.panchor_struct->Slots[2];
-	pbeacon->sync_header.bop_3 = uwb_node.panchor_struct->Slots[3];
+	memcpy((uint8_t*)(pbeacon->sync_header.Slots), (uint8_t*)(anchor_struct.Slots), 4 * sizeof(uint16_t));
+
+#if(LOG_WHAT == LOG_SLOT)
+	//ref_id, my_slot, my_level, Slots
+	printf("%d,%d,%d,%d,%d,%d,%d\r\n", anchor_struct.ref_id, anchor_struct.my_slot, anchor_struct.level,
+			anchor_struct.Slots[0], anchor_struct.Slots[1],
+			anchor_struct.Slots[2], anchor_struct.Slots[3]);
+#endif
+
 #endif
 
 	//查看Ranging_tags_value当中，哪一些没有is_available的，absence++
@@ -532,6 +566,254 @@ void issue_beacon(uint16_t id){
 
 	UWB_Issue_Beacon_Frame((uint8_t*)pbeacon, BEACON_COMMON_LEN + ranging_num * 2);
 
+}
+//不断地随机选择是选择哪一个吧是不是
+static void anchor_master(uint16_t anchor_id, uint16_t anchor_pan, const UWB_Sync_Header_t* sync_header, uint64_t rx_ts){
+
+#if(USE_LOG)
+	printf("I hear an master from 0x%x, with ref_id = 0x%x, level = %d. \r\n", anchor_id, sync_header->ref_id, sync_header->level);
+#endif
+	//是否还是需要分状态机编程？
+	const uint16_t* pSlots = sync_header->Slots;
+	anchor_struct.level = sync_header->level +1;
+	anchor_struct.ref_id = sync_header->ref_id;
+
+	uint8_t master_slot;
+	uint8_t my_slot;
+	uint8_t is_inserted = 0;
+	uint8_t other_slot = 0;
+	uint8_t others = 0;
+	uint32_t random;
+	uint8_t is_neighbor = 0;
+
+	for(int i = 0; i < 4; i++){
+		anchor_struct.Slots[i] = 0xFFFF;
+		if(pSlots[i] == anchor_id){
+			master_slot = i;
+		}else if(pSlots[i] == MY_ID){
+			my_slot = i;
+			is_inserted = 1;
+		}else if(pSlots[i] == 0xFFFF){
+			continue;
+		}else{
+			others ++;
+			other_slot = i;
+		}
+	}
+	anchor_struct.Slots[master_slot] = anchor_id;
+	anchor_struct.master_slot = master_slot;
+	//初始化更新一下Slot
+
+	//更新neighbor信息，以及更新Slots当中的其他Neighbor
+	switch(anchor_struct.neighbor_num){
+	case 0:
+		anchor_struct.neighbors[0] = anchor_id;
+		anchor_struct.neighbor_slots[0] = master_slot;
+		anchor_struct.neighbor_num = 1;
+		break;
+	case 1:
+		if(anchor_struct.neighbors[0] == anchor_id){
+			anchor_struct.neighbor_slots[0] = master_slot;
+		}else{
+			anchor_struct.neighbor_slots[0] = (master_slot&0x02)|((~(master_slot&0x01))&0x01);
+			anchor_struct.Slots[anchor_struct.neighbor_slots[0]] = anchor_struct.neighbors[0];
+			anchor_struct.neighbors[1] = anchor_id;
+			anchor_struct.neighbor_slots[1]= master_slot;
+			anchor_struct.neighbor_num = 2;
+		}
+		break;
+	case 2:
+		for(int i = 0; i < 2; i++){
+			if(anchor_struct.neighbors[i] == anchor_id){
+				is_neighbor = 1;
+				if(anchor_struct.neighbor_slots[i] != master_slot){
+					anchor_struct.neighbor_slots[i] = master_slot;
+				}
+			}else{
+				anchor_struct.neighbor_slots[i] = (master_slot&0x02)|((~(master_slot&0x01))&0x01);
+				anchor_struct.Slots[anchor_struct.neighbor_slots[i]] = anchor_struct.neighbors[i];
+			}
+		}
+		if(is_neighbor == 0){
+#if(USE_LOG)
+			printf("Something is wrong. There are two many neighbors");
+#endif
+			anchor_struct.neighbors[0] = anchor_id;
+			anchor_struct.neighbor_slots[0] = master_slot;
+		}
+		break;
+	default:
+#if(USE_LOG)
+		printf("Something is wrong. There are two many neighbors");
+#endif
+		break;
+	}
+
+	//更新my_slot,并且reschedule beacon
+	if(is_inserted == 1){
+		anchor_struct.Slots[my_slot] = MY_ID;
+		anchor_struct.my_slot = my_slot;
+	}else{
+		if(others == 1){
+			anchor_struct.my_slot = (other_slot&0x02)|((~(other_slot&0x01))&0x01);  //只要末尾的这一个了啦
+		}else{// others = 0;
+			//应该不要出现2个的情况吧？
+			random = uwb_node.get_rand();
+			anchor_struct.my_slot = ((~(master_slot&0x02))&0x02)|(random&0x01);
+		}
+		anchor_struct.Slots[anchor_struct.my_slot] = MY_ID;
+	}
+	//schedule beacon for the next one
+	int8_t delat = (master_slot&0x01) - (anchor_struct.my_slot&0x01);
+	uint64_t beacon_tx = getSumT(rx_ts, MS_500);
+	if(delat > 0){
+		beacon_tx = getDeltaT(beacon_tx, MS_2);
+	}else if (delat < 0){
+		beacon_tx = getSumT(beacon_tx, MS_2);
+	}
+	if(uwb_node.state != initial){
+		// > 350ms
+		if(getDeltaT(rx_ts, anchor_struct.anchor_times.Start_Beacon) > MS_350){
+			anchor_struct.anchor_times.Next_Beacon = beacon_tx;
+		}
+		// < 350ms，把时间往后再往后推迟1s，在不破坏当前超帧的情况下继续完成下面的
+		else{
+			DISABLE_TIMER15();
+			ENABLE_TIMER15_ARR(TIMER15_1_3S);  //3ms之后
+			anchor_struct.anchor_times.Next_Beacon = getSumT(beacon_tx, S_TO_DWT_TIME);
+		}
+	}else{
+		DISABLE_TIMER15();
+		uwb_node.state = non_ranging;
+		ENABLE_TIMER15_ARR(TIMER15_0_3S);  //3ms之后
+		anchor_struct.anchor_times.Next_Beacon = beacon_tx;
+	}
+
+}
+
+static uint8_t anchor_slave(uint16_t anchor_id, uint16_t anchor_pan, const UWB_Sync_Header_t* sync_header, uint64_t rx_ts){
+
+	const uint16_t* pSlots = sync_header->Slots;
+	uint8_t other_slot;
+	uint8_t others = 0;
+	int8_t slave_slot = -1;  //那我就是随便选择一个呀也是
+	int8_t my_slot = -1;
+
+	uint32_t random;
+	int8_t delat;
+
+	for (int i = 0; i < 4; i++) {
+		if (pSlots[i] == anchor_id) {
+			slave_slot = i;
+		} else if (pSlots[i] == 0xFFFF) {
+			continue;
+		}else if(pSlots[i] == MY_ID){
+			my_slot = i;
+		}
+		else {
+			//others
+			others++;
+			other_slot = i;
+		}
+	}
+
+#if(USE_LOG)
+	printf("I hear a slave anchor.\r\n");
+#endif
+	if(uwb_node.state == initial){
+
+		/**
+		 * 1. 取消Issue_beacon的定时器
+		 * 2. 找到自己的Slot，填充Sync相关信息
+		 * 3. 设置下一个Beacon发送
+		 */
+		DISABLE_TIMER15();
+		uwb_node.state = non_ranging;
+		//把slave添加到我的neighbor当中
+		anchor_struct.neighbors[0] = anchor_id;
+		anchor_struct.neighbor_slots[0] = slave_slot;
+		anchor_struct.neighbor_num = 1;
+		anchor_struct.Slots[slave_slot] = anchor_id;
+
+		if (my_slot != -1) {
+			//掉线后重新上电
+			anchor_struct.my_slot = my_slot;
+		} else {
+			if (others) {
+				anchor_struct.my_slot = (other_slot & 0x02)
+						| ((~(other_slot & 0x01)) & 0x01);
+			} else {
+				random = uwb_node.get_rand();
+				anchor_struct.my_slot = ((~(slave_slot & 0x02)) & 0x02)
+						| (random & 0x01);
+			}
+		}
+		anchor_struct.Slots[anchor_struct.my_slot] = MY_ID;
+
+		//schedule beacon
+		anchor_struct.anchor_times.Next_Beacon = getSumT(rx_ts, MS_500);
+		delat = (slave_slot & 0x01) - (anchor_struct.my_slot & 0x01);
+		if(delat > 0){
+			anchor_struct.anchor_times.Next_Beacon = getDeltaT(anchor_struct.anchor_times.Next_Beacon, MS_2);
+		}else if(delat < 0){
+			anchor_struct.anchor_times.Next_Beacon = getSumT(anchor_struct.anchor_times.Next_Beacon, MS_2);
+		}
+		ENABLE_TIMER15_ARR(TIMER15_0_3S);
+		return slave_slot;
+	}
+
+	//其实应该是还是需要考虑说不破坏slave的原先的情况的？
+	switch(anchor_struct.neighbor_num){
+	case 0:
+		anchor_struct.neighbors[0] = anchor_id;
+		anchor_struct.neighbor_num = 1;
+SameSlave:
+		if((slave_slot&0x02) != (anchor_struct.my_slot&0x02)){   //尽量非破坏性？ 但是我是不会与之同步时间的。
+			anchor_struct.neighbor_slots[0] = slave_slot;
+			anchor_struct.Slots[slave_slot] = anchor_id;
+		}else{
+			slave_slot = ((~(anchor_struct.my_slot&0x02))&0x02);
+			anchor_struct.neighbor_slots[0] = slave_slot;
+			anchor_struct.Slots[anchor_struct.neighbor_slots[0]] = anchor_id;
+		}
+		break;
+	case 1:
+		if(anchor_struct.neighbors[0] == anchor_id){
+			anchor_struct.Slots[anchor_struct.neighbor_slots[0]] = 0xFFFF;
+			goto SameSlave;
+		}else{
+			anchor_struct.neighbors[1] = anchor_id;
+			slave_slot = (anchor_struct.neighbor_slots[0]&0x02)|((~(anchor_struct.neighbor_slots[0]&0x01))&0x01);
+			anchor_struct.neighbor_slots[1] = slave_slot;
+			anchor_struct.Slots[slave_slot] = anchor_id;
+			anchor_struct.neighbor_num = 2;
+		}
+		break;
+	case 2:
+		for(int i = 0; i< 2; i++){
+			if(anchor_struct.neighbors[i] == anchor_id){
+				//那就不需要改动了哈，保持原样 ~
+				return anchor_struct.neighbor_slots[i];
+			}else{
+				other_slot = anchor_struct.neighbor_slots[i];
+			}
+		}
+		//未曾
+#if(USE_LOG)
+		printf("Something is wrong, there are two many neighbors.\r\n");
+#endif
+		anchor_struct.neighbors[0] = anchor_id;
+		slave_slot = (other_slot&0x02)|((~(other_slot&0x01))&0x01);  //假定直接第一个的吧
+		anchor_struct.neighbor_slots[0] = slave_slot;
+		anchor_struct.Slots[slave_slot] = anchor_id;
+		break;
+	default:
+#if(USE_LOG)
+		printf("Something is wrong, there are two many neighbors.\r\n");
+#endif
+		break;
+	}
+	return slave_slot;
 }
 
 

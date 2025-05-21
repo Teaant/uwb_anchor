@@ -48,7 +48,7 @@ void initTag(void){
 
 	//wake_up time
 	//TIM15的时钟频率
-	uwb_node.wakeup_time = (INTERVAL -1) * 10000 + 9000;   //若是很大的呢？ 暂时只考虑6以内？
+	uwb_node.wakeup_time = (INTERVAL -1) * 10000 + 9000;   //若是很大的呢？ 暂时只考虑6以内？  900ms行哈，有100ms的雨量，那我就150ms
 
 	register_tx_cb(applying, applying_txDone_cb);
 	register_tx_cb(polling, poll_txDone_cb);

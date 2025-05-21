@@ -19,6 +19,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "dma.h"
+#include "rng.h"
 #include "spi.h"
 #include "tim.h"
 #include "usart.h"
@@ -56,16 +57,7 @@
 
 #define TEST_DEMO	0
 
-#if(MY_ROLE == TAG)
-#define USE_WIFI	0
-#else
-#define USE_WIFI	1
-#endif
 
-
-#if(USE_WIFI)
-#define USE_LOG		1
-#endif
 
 #define TEST_ADD_NODE	0
 #if(TEST_ADD_NODE)
@@ -107,6 +99,8 @@ __attribute__ ((section(".shared"))) volatile PDoA_Frame_t rxBuffer;
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 void PeriphCommonClock_Config(void);
+
+static uint32_t getRandom(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -195,10 +189,18 @@ int main(void)
   MX_TIM15_Init();
   MX_TIM4_Init();
   MX_TIM6_Init();
+
+  MX_RNG_Init();
+
+
   /* USER CODE BEGIN 2 */
+	if (hrng.State == HAL_RNG_STATE_READY) {
+		uwb_node.rand_ok = 1;
+		//设置回调函数
+		uwb_node.get_rand = getRandom;
+	}
 
 #if(!TEST_DEMO)
-
 
 	HAL_NVIC_DisableIRQ(EXTI15_10_IRQn);
 
@@ -282,9 +284,10 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI48|RCC_OSCILLATORTYPE_HSI;
   RCC_OscInitStruct.HSIState = RCC_HSI_DIV1;
   RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
+  RCC_OscInitStruct.HSI48State = RCC_HSI48_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
   RCC_OscInitStruct.PLL.PLLM = 4;
@@ -347,7 +350,16 @@ void PeriphCommonClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
+static uint32_t getRandom(void){
 
+	uint32_t num = 0;
+
+	HAL_RNG_GenerateRandomNumber(&hrng,  &num);
+
+	return num;
+
+
+}
 /* USER CODE END 4 */
 
 /**
@@ -385,6 +397,11 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 		//wake up the tag ~
 		uwb_node.ptag_struct->timer15_callback();
 #else    // ANCHOR
+		//随机数获取成功了
+//#if(USE_LOG)
+//		uint32_t random = uwb_node.get_rand();
+//		printf("random = %lu. \r\n", random);
+//#endif
 		timer15_callback();
 
 #endif

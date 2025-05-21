@@ -13,10 +13,23 @@
 #define 	PAN_ID				(0x3737)
 
 #if(MY_ROLE == ANCHOR)
-#define 	MY_ID				(0xAAAA)
+#define 	MY_ID				(0xBBEE)
 #else
 #define 	MY_ID				(0xCC22)
 #endif
+
+#if(MY_ROLE == TAG)
+#define USE_WIFI	0
+#else
+#define USE_WIFI	1
+#endif
+
+
+#if(USE_WIFI)
+#define USE_LOG		0
+#endif
+
+
 
 
 #define INTERVAL		(2)

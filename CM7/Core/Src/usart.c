@@ -267,8 +267,8 @@ void Connect_Wifi(void){
 	//OK
 	HAL_Delay(500);
 	//查看版本信息
-//	printf("AT+GMR\r\n");
-//	HAL_Delay(500);
+	printf("AT+GMR\r\n");
+	HAL_Delay(500);   //好像必须要有一个这个吗？
 	//设置 ESP32 设备的 Wi-Fi 模式
 	/*
 	 * 	0: 无 Wi-Fi 模式，并且关闭 Wi-Fi RF
@@ -278,13 +278,13 @@ void Connect_Wifi(void){
 	 * */
 	printf("AT+CWMODE=1\r\n");
 	//OK
-	HAL_Delay(500);
+	HAL_Delay(1000);
 	//设置 ESP32 Station 需连接的 AP
 	printf("AT+CWJAP=\"vivo\",\"1234567890\"\r\n");
 	HAL_Delay(3000);
 	//建立 TCP 连接
 	printf("AT+CIPSTART=\"TCP\",\"192.168.137.2\",8989\r\n");
-	HAL_Delay(2000);
+	HAL_Delay(3000);
 	//设置传输模式
 	/**
 	 *0: 普通传输模式
@@ -292,7 +292,7 @@ void Connect_Wifi(void){
 	 * 配置不保存到FLASH，所以可能需要适时更改 ~
 	 */
 	printf("AT+CIPMODE=1\r\n");
-	HAL_Delay(500);
+	HAL_Delay(1000);
 	//进入 Wi-Fi 透传模式
 	printf("AT+CIPSEND\r\n");
 

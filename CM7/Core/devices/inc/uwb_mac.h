@@ -116,6 +116,7 @@ typedef struct{
 	volatile Node_State_t state;   //状态 ~
 
 	uint8_t sequence;
+	uint8_t rand_ok;
 
 	UWBDef* device;
 
@@ -129,6 +130,7 @@ typedef struct{
 #endif
 
 	int32_t (*uwb_phy_init)(uint16_t ID);
+	uint32_t (*get_rand)(void);  //获取一个随机数
 
 }UWB_Node_t;
 

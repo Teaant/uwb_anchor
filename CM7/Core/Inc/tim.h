@@ -68,7 +68,9 @@ extern TIM_HandleTypeDef htim15;
 
 
 #define TIMER15_5S				49999
+#define TIMER15_1_3S			12999
 #define TIMER15_1S				9999
+#define TIMER15_0_3S			2999
 #define TIMER15_0_8S			7999
 #define TIMER15_0_9S			8999
 

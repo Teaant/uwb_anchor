@@ -25,6 +25,7 @@ typedef struct{
 
 	//统一设置为0的时候吧，那就等一个十几秒吧 ~
 	uint64_t Start_Beacon;   //BOP 0或者2的开始时间，并不是我的Beacon发送的时间
+	uint64_t Tx_Beacon;
 	uint64_t Next_Start_Beacon;	 //下一个时间，和下面那个相等或者 ~
 	uint64_t Next_Beacon;
 
@@ -36,9 +37,11 @@ typedef struct{
 #if(ENABLE_SYNC)
 	uint16_t ref_id;
 	uint8_t level;
-	uint8_t my_slot; //bop 1,2,3,4
+	uint8_t my_slot; //bop 1,2,3,4  //那还是0123呗
 	uint8_t master_slot;
+	uint8_t neighbor_num;
 	uint16_t neighbors[2];
+	uint8_t neighbor_slots[2];
 	uint16_t Slots[4];
 #endif
 

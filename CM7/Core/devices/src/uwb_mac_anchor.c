@@ -437,7 +437,7 @@ void prepare_beacon(uint16_t id){
 
 #if(LOG_WHAT == LOG_SLOT)
 	//ref_id, my_slot, my_level, Slots
-	printf("%d,%d,%d,%d,%d,%d,%d\r\n", anchor_struct.ref_id, anchor_struct.my_slot, anchor_struct.level,
+	printf("%d,%d,%d,%d,%d,%d,%d,%d\r\n", MY_ID, anchor_struct.ref_id, anchor_struct.my_slot, anchor_struct.level,
 			anchor_struct.Slots[0], anchor_struct.Slots[1],
 			anchor_struct.Slots[2], anchor_struct.Slots[3]);
 #endif
@@ -518,7 +518,7 @@ void issue_beacon(uint16_t id){
 
 #if(LOG_WHAT == LOG_SLOT)
 	//ref_id, my_slot, my_level, Slots
-	printf("%d,%d,%d,%d,%d,%d,%d\r\n", anchor_struct.ref_id, anchor_struct.my_slot, anchor_struct.level,
+	printf("%d,%d,%d,%d,%d,%d,%d,%d\r\n", MY_ID,anchor_struct.ref_id, anchor_struct.my_slot, anchor_struct.level,
 			anchor_struct.Slots[0], anchor_struct.Slots[1],
 			anchor_struct.Slots[2], anchor_struct.Slots[3]);
 #endif

@@ -283,7 +283,7 @@ void Connect_Wifi(void){
 	printf("AT+CWJAP=\"vivo\",\"1234567890\"\r\n");
 	HAL_Delay(3000);
 	//建立 TCP 连接
-	printf("AT+CIPSTART=\"TCP\",\"192.168.137.2\",8989\r\n");
+	printf("AT+CIPSTART=\"TCP\",\"192.168.137.1\",8989\r\n");
 	HAL_Delay(3000);
 	//设置传输模式
 	/**

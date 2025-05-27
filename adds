@@ -34,3 +34,6 @@ lu
 endif
 tx
 config
+cfg
+deinit
+rxing

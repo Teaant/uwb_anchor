@@ -69,10 +69,14 @@ extern TIM_HandleTypeDef htim15;
 
 #define TIMER15_5S				49999
 #define TIMER15_1_3S			12999
+#define TIMER15_1_4S			13999
 #define TIMER15_1S				9999
 #define TIMER15_0_3S			2999
+#define TIMER15_0_4S			4999
 #define TIMER15_0_8S			7999
 #define TIMER15_0_9S			8999
+
+#define TIMER4_50MS				500
 
 #define ENABLE_TIMER15_ARR(period)		__HAL_TIM_CLEAR_FLAG(&htim15, TIM_FLAG_UPDATE);\
 										TIM15->ARR = period;\
@@ -88,8 +92,11 @@ extern TIM_HandleTypeDef htim15;
 
 #define DISABLE_TIMER4()		__HAL_TIM_DISABLE(&htim4);\
 								__HAL_TIM_SET_COUNTER(&htim4, 0)
-//那之前的那个，还会这样出现吗？ 就是还是按照之前的值呢？
 
+//那之前的那个，还会这样出现吗？ 就是还是按照之前的值呢？
+#define ENABLE_TIMER4_ARR(period)		__HAL_TIM_CLEAR_FLAG(&htim4, TIM_FLAG_UPDATE);\
+										TIM4->ARR =period;\
+										__HAL_TIM_ENABLE(&htim4)
 
 /* USER CODE END Private defines */
 

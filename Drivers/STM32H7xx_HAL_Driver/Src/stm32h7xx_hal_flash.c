@@ -151,6 +151,7 @@ FLASH_ProcessTypeDef pFlash;
   *
   * @retval HAL_StatusTypeDef HAL Status
   */
+//一次写入8个四字节的数据 ~
 HAL_StatusTypeDef HAL_FLASH_Program(uint32_t TypeProgram, uint32_t FlashAddress, uint32_t DataAddress)
 {
   HAL_StatusTypeDef status;
@@ -167,7 +168,7 @@ HAL_StatusTypeDef HAL_FLASH_Program(uint32_t TypeProgram, uint32_t FlashAddress,
   __HAL_LOCK(&pFlash);
 
 #if defined (FLASH_OPTCR_PG_OTP)
-  if((IS_FLASH_PROGRAM_ADDRESS_BANK1(FlashAddress)) || (IS_FLASH_PROGRAM_ADDRESS_OTP(FlashAddress)))
+  if((IS_FLASH_PROGRAM_ADDRESS_BANK1(FlashAddress)) || (IS_FLASH_PROGRAM_A      DDRESS_OTP(FlashAddress)))
 #else
   if(IS_FLASH_PROGRAM_ADDRESS_BANK1(FlashAddress))
 #endif /* FLASH_OPTCR_PG_OTP */
@@ -246,7 +247,7 @@ HAL_StatusTypeDef HAL_FLASH_Program(uint32_t TypeProgram, uint32_t FlashAddress,
       /* Program the flash word */
       do
       {
-        *dest_addr = *src_addr;
+        *dest_addr = *src_addr;	//这里就实现了写的操作了？
         dest_addr++;
         src_addr++;
         row_index--;

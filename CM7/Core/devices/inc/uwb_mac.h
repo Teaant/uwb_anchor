@@ -60,6 +60,7 @@ typedef enum{
 
 typedef struct{
 
+	uint8_t if_switch;
 	uint16_t node_id;
 	uint16_t pan_id; //感觉pan_id也不是说必需的
 	float signal;		//信号强度

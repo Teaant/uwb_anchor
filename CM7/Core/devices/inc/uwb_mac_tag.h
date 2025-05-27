@@ -19,6 +19,7 @@ typedef struct{
 	uint8_t micro2;
 	uint8_t micro3;
 
+	uint8_t interval;
 	uint8_t cap_start;
 
 	volatile uint16_t applying_anchor;

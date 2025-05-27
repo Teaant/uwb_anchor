@@ -17,9 +17,10 @@
 
 #define PI 3.1415926
 #define PI2 	6.2831852
-
+//默认地最大的发射功率
+#define DEFAULT_TX_POWER	0xC2C2C2C2
 //通信距离？ ~
-#define 	COMM_RANGING	3
+#define 	COMM_RANGE	3
 
 # define DEFAULT_ANT_DELAY 16451
 

@@ -62,6 +62,10 @@ static void refresh_table(void);
 //但是广播就广播，也没什么关系了，我只要保持，对，而且那些标签如果出于延迟发送，就是不会接收的，可以 ~
 volatile uint8_t resp_times = 0;
 
+
+extern Flash_Config_t flash_config;
+
+
 volatile Anchor_Struct_t anchor_struct = {
 #if(ENABLE_SYNC)
 		.ref_id = MY_ID,
@@ -80,6 +84,8 @@ volatile UWB_Date_Resp_t resp_buffer = {0, };
 void initAnchor(void){
 
 	tags_table = NULL;
+
+	anchor_struct.comm_range = flash_config.comm_range;
 
 	anchor_struct.req_ack_buffer.header.control = ACK_FRAME_CONTROL;
 	anchor_struct.req_ack_buffer.header.pan_id = PAN_ID;
@@ -217,8 +223,31 @@ void anchor_parse_ranging(uint16_t microSlot){
 				return;//CAP
 			}
 #if(ENABLE_SYNC)
-
 #endif
+			break;
+		case UWB_Cmd_Power:
+			printf("receive tx_power config with power = 0x%x. \r\n", interval);
+			flash_config.tx_power = (uint32_t)interval << 24 | (uint32_t)interval << 16
+		             | (uint32_t)interval << 8  | interval;
+			if(Flash_WriteConfig(&flash_config) == HAL_OK){
+				Software_Reset();
+			}
+			break;
+		case UWB_Cmd_Wifi:
+			printf("receive server config with server = %d. old = %ld.\r\n", interval, flash_config.tcp_server);
+			if(interval != flash_config.tcp_server){
+				if(interval == 1 || interval ==2){
+					flash_config.tcp_server = interval;
+					if(Flash_WriteConfig(&flash_config) == HAL_OK){
+						Software_Reset();	//或许只需要重新连接Server
+					}
+				}
+			}
+			break;
+		case UWB_Cmd_Range:
+			anchor_struct.comm_range = interval;
+			flash_config.comm_range = interval;
+			Flash_WriteConfig(&flash_config);
 			break;
 		default:
 			break;
@@ -284,7 +313,7 @@ void beacon_txdone_cb(uint64_t tx_ts){
 #endif
 	anchor_struct.anchor_times.Next_Beacon = getSumT(tx_ts, S_TO_DWT_TIME);
 
-	ENABLE_TIMER15_ARR(TIMER15_0_8S);
+	ENABLE_TIMER15_ARR(TIMER15_0_9S);	//把后续余量改为100ms
 
 }
 
@@ -316,15 +345,20 @@ void configure_resp_to_dw1000(uint16_t id){
 
 	(void) id;
 	//就只差最后的StartTx了
-	int sum = 0;
+
+	resp_buffer.switches = 0;
+
 	uint16_t* pID = &resp_buffer.ID1;
+
 	for(int i = 0; i < 3; i++){
 		if(ranging_tags_value[(ranging_group_num-1)*3+i].pnode && ranging_tags_value[(ranging_group_num-1)*3+i].is_valid == 1){
 			*(pID+i) = ranging_tags_value[(ranging_group_num-1)*3].pnode->slot_alloc.node_id;
-			sum += 1;
+
+			if(ranging_tags_value[(ranging_group_num-1)*3+i].pnode->slot_alloc.if_switch == 1){
+				resp_buffer.switches |= (1<<i);
+			}
 		}else {
 			*(pID+i) = MY_ID;
-			sum += 1;
 		};
 	}
 	UWB_Configure_Resp_In_Buffer((uint8_t*)(&resp_buffer), RESP_MSG_LEN, 0, anchor_struct.resp_tx_time&0xFFFFFFFFFFFFFE00);
@@ -382,6 +416,12 @@ void calculate_distance(uint16_t index){
 	{
 		ranging_tags_value[index].distance = 0.3;
 	}
+
+	if(ranging_tags_value[index].distance > (float)anchor_struct.comm_range / 2.0){
+		ranging_tags_value[index].pnode->slot_alloc.if_switch = 1;
+	}else{
+		ranging_tags_value[index].pnode->slot_alloc.if_switch = 0;
+	}
 	/**
 	 * @TODO  Upload data
 	 * 还有角度信息需要从CM4内核当中去获取
@@ -436,10 +476,13 @@ void prepare_beacon(uint16_t id){
 	memcpy((uint8_t*)(pbeacon->sync_header.Slots), (uint8_t*)(anchor_struct.Slots), 4 * sizeof(uint16_t));
 
 #if(LOG_WHAT == LOG_SLOT)
-	//ref_id, my_slot, my_level, Slots
-	printf("%d,%d,%d,%d,%d,%d,%d,%d\r\n", MY_ID, anchor_struct.ref_id, anchor_struct.my_slot, anchor_struct.level,
-			anchor_struct.Slots[0], anchor_struct.Slots[1],
-			anchor_struct.Slots[2], anchor_struct.Slots[3]);
+	uin32_t rand = uwb_node.get_rand();
+	rand = rand % TIMER4_50MS;
+	ENABLE_TIMER4_ARR(rand);
+//	//ref_id, my_slot, my_level, Slots
+//	printf("0x%x,0x%x,%d,%d,0x%x,0x%x,0x%x,0x%x\r\n", MY_ID, anchor_struct.ref_id, anchor_struct.my_slot, anchor_struct.level,
+//			anchor_struct.Slots[0], anchor_struct.Slots[1],
+//			anchor_struct.Slots[2], anchor_struct.Slots[3]);
 #endif
 
 #endif
@@ -487,6 +530,14 @@ void prepare_beacon(uint16_t id){
 
 }
 
+void Log_Data(uint16_t id){
+	//ref_id, my_slot, my_level, Slots
+	printf("0x%x,0x%x,%d,%d,0x%x,0x%x,0x%x,0x%x\r\n", MY_ID,
+			anchor_struct.ref_id, anchor_struct.my_slot, anchor_struct.level,
+			anchor_struct.Slots[0], anchor_struct.Slots[1],
+			anchor_struct.Slots[2], anchor_struct.Slots[3]);
+}
+
 
 void issue_beacon(uint16_t id){
 
@@ -518,7 +569,7 @@ void issue_beacon(uint16_t id){
 
 #if(LOG_WHAT == LOG_SLOT)
 	//ref_id, my_slot, my_level, Slots
-	printf("%d,%d,%d,%d,%d,%d,%d,%d\r\n", MY_ID,anchor_struct.ref_id, anchor_struct.my_slot, anchor_struct.level,
+	printf("0x%x,0x%x,%d,%d,0x%x,0x%x,0x%x,0x%x\r\n", MY_ID,anchor_struct.ref_id, anchor_struct.my_slot, anchor_struct.level,
 			anchor_struct.Slots[0], anchor_struct.Slots[1],
 			anchor_struct.Slots[2], anchor_struct.Slots[3]);
 #endif
@@ -657,7 +708,7 @@ static void anchor_master(uint16_t anchor_id, uint16_t anchor_pan, const UWB_Syn
 		if(others == 1){
 			anchor_struct.my_slot = (other_slot&0x02)|((~(other_slot&0x01))&0x01);  //只要末尾的这一个了啦
 		}else{// others = 0;
-			//应该不要出现2个的情况吧？
+			//应该不要出现2个的情况吧？  但是就是出现了2个的情况，事情就是这样，所以东芝这个总是和前两者发生了冲突来着的 ~
 			random = uwb_node.get_rand();
 			anchor_struct.my_slot = ((~(master_slot&0x02))&0x02)|(random&0x01);
 		}
@@ -685,7 +736,7 @@ static void anchor_master(uint16_t anchor_id, uint16_t anchor_pan, const UWB_Syn
 	}else{
 		DISABLE_TIMER15();
 		uwb_node.state = non_ranging;
-		ENABLE_TIMER15_ARR(TIMER15_0_3S);  //3ms之后
+		ENABLE_TIMER15_ARR(TIMER15_0_4S);  //3ms之后
 		anchor_struct.anchor_times.Next_Beacon = beacon_tx;
 	}
 
@@ -735,6 +786,8 @@ static uint8_t anchor_slave(uint16_t anchor_id, uint16_t anchor_pan, const UWB_S
 		anchor_struct.neighbor_num = 1;
 		anchor_struct.Slots[slave_slot] = anchor_id;
 
+		anchor_struct.Slots[anchor_struct.my_slot] = 0xFFFF;
+
 		if (my_slot != -1) {
 			//掉线后重新上电
 			anchor_struct.my_slot = my_slot;
@@ -765,6 +818,7 @@ static uint8_t anchor_slave(uint16_t anchor_id, uint16_t anchor_pan, const UWB_S
 	//其实应该是还是需要考虑说不破坏slave的原先的情况的？
 	switch(anchor_struct.neighbor_num){
 	case 0:
+		//保持不变的 ~
 		anchor_struct.neighbors[0] = anchor_id;
 		anchor_struct.neighbor_num = 1;
 SameSlave:
@@ -772,9 +826,9 @@ SameSlave:
 			anchor_struct.neighbor_slots[0] = slave_slot;
 			anchor_struct.Slots[slave_slot] = anchor_id;
 		}else{
-			slave_slot = ((~(anchor_struct.my_slot&0x02))&0x02);
+			slave_slot = ((~(anchor_struct.my_slot&0x02))&0x02);	//此处
 			anchor_struct.neighbor_slots[0] = slave_slot;
-			anchor_struct.Slots[anchor_struct.neighbor_slots[0]] = anchor_id;
+			anchor_struct.Slots[slave_slot] = anchor_id;
 		}
 		break;
 	case 1:

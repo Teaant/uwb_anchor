@@ -90,6 +90,12 @@ __attribute__ ((section(".shared"))) volatile uint32_t error_status = 0;
 
 __attribute__ ((section(".shared"))) volatile PDoA_Frame_t rxBuffer;
 
+#define CONFIG_FLASH_ADDRESS	0x080E0000
+
+#define CONFIG_FLASH_SECTOR		7
+
+extern Flash_Config_t flash_config;
+
 //volatile AoADiagnosticTypeDef aoa_diagnostic[DWT_NUM_DW_DEV] __attribute__ ((section(".shared")));
 
 //volatile float aoa_calibration_table_raw[4][AOA_CALIBRATION_TABLE_LENGTH] __attribute__ ((section(".shared")));
@@ -117,6 +123,8 @@ uint8_t is_fail = 0;
 extern UART_HandleTypeDef huart2;
 
 volatile uint8_t counts = 0;
+
+
 
 /* USER CODE END 0 */
 
@@ -200,25 +208,23 @@ int main(void)
 		uwb_node.get_rand = getRandom;
 	}
 
-#if(!TEST_DEMO)
-
-	HAL_NVIC_DisableIRQ(EXTI15_10_IRQn);
-
-	initNode();
-
-	for (int i = 0; i < DWT_NUM_DW_DEV; i++) {
-		if (uwb_node.device->ports[i].avalible == 1) {
-			/* Set expected response's delay and timeout. See NOTE 4, 5 and 6 below.
-			 * As this example only handles one incoming frame with always the same delay and timeout, those values can be set here once for all. */
-#if(USE_LOG)
-			printf("DW1000 init successful.\r\n");
-#endif
-			dwt_setrxaftertxdelay(0,  &uwb_node.device->ports[i]);
-			dwt_setrxtimeout(0, &uwb_node.device->ports[i]);
-			HAL_NVIC_ClearPendingIRQ(uwb_node.device->ports[i].exti_line);
-			HAL_NVIC_EnableIRQ(uwb_node.device->ports[i].exti_line);
-//			if(i == 0)
-//			dwt_rxenable(DWT_START_RX_IMMEDIATE, &uwb_node.device->ports[i]);  //也并不需要
+	if(Flash_ReadConfig(&flash_config)){
+		if(flash_config.tx_power == 0xFFFFFFFF
+				|| flash_config.tcp_server == 0xFFFFFFFF
+				|| flash_config.tag_interval == 0xFFFFFFFF
+				|| flash_config.comm_range == 0xFFFFFFFF){
+			printf("first time to flash config, write default.\r\n");
+			flash_config.tx_power = DEFAULT_TX_POWER;
+			flash_config.tcp_server = 1;
+			flash_config.tag_interval = INTERVAL;
+			flash_config.comm_range = COMM_RANGE;
+			if(Flash_WriteConfig(&flash_config) == HAL_OK){
+				printf("write to flash success.\r\n");
+			}else{
+				printf("write to flash fail.\r\n");
+			}
+		}else{
+			printf("read config.\r\n");
 		}
 	}
 
@@ -232,8 +238,31 @@ int main(void)
 
 	HAL_Delay(500);
 	Connect_Wifi();
-
 #endif
+
+#if(!TEST_DEMO)
+
+	HAL_NVIC_DisableIRQ(EXTI15_10_IRQn);
+
+	initNode();
+
+	for (int i = 0; i < DWT_NUM_DW_DEV; i++) {
+		if (uwb_node.device->ports[i].avalible == 1) {
+			/* Set expected response's delay and timeout. See NOTE 4, 5 and 6 below.
+			 * As this example only handles one incoming frame with always the same delay and timeout, those values can be set here once for all. */
+//#if(USE_LOG)
+//			printf("DW1000 init successful.\r\n");
+//#endif
+			dwt_setrxaftertxdelay(0,  &uwb_node.device->ports[i]);
+			dwt_setrxtimeout(0, &uwb_node.device->ports[i]);
+			HAL_NVIC_ClearPendingIRQ(uwb_node.device->ports[i].exti_line);
+			HAL_NVIC_EnableIRQ(uwb_node.device->ports[i].exti_line);
+//			if(i == 0)
+//			dwt_rxenable(DWT_START_RX_IMMEDIATE, &uwb_node.device->ports[i]);  //也并不需要
+		}
+	}
+
+
 
 #endif
 
@@ -351,14 +380,59 @@ void PeriphCommonClock_Config(void)
 
 /* USER CODE BEGIN 4 */
 static uint32_t getRandom(void){
-
 	uint32_t num = 0;
-
 	HAL_RNG_GenerateRandomNumber(&hrng,  &num);
-
 	return num;
+}
 
 
+HAL_StatusTypeDef Flash_WriteConfig(Flash_Config_t *cfg)
+{
+    HAL_StatusTypeDef status;
+    uint32_t address = CONFIG_FLASH_ADDRESS;
+//    uint32_t *data = (uint32_t *)cfg;
+
+    HAL_FLASH_Unlock();
+
+    FLASH_EraseInitTypeDef EraseInitStruct;
+    uint32_t SectorError;
+
+    EraseInitStruct.TypeErase = FLASH_TYPEERASE_SECTORS;
+    EraseInitStruct.Banks = FLASH_BANK_1;
+    EraseInitStruct.Sector = CONFIG_FLASH_SECTOR;
+    EraseInitStruct.NbSectors = 1;
+    EraseInitStruct.VoltageRange = FLASH_VOLTAGE_RANGE_3; // 2.7V~3.6V
+
+    status = HAL_FLASHEx_Erase(&EraseInitStruct, &SectorError);
+    if (status != HAL_OK)
+    {
+        HAL_FLASH_Lock();
+        return status;
+    }
+
+    //该系列MCU一个Flash字是8 个32-bit大小，刚好我设置的是cfg这里
+    status = HAL_FLASH_Program(FLASH_TYPEPROGRAM_FLASHWORD, address, (uint32_t)cfg);
+    if (status != HAL_OK)
+    {
+        HAL_FLASH_Lock();
+        return status;
+    }
+
+    HAL_FLASH_Lock();
+
+    return HAL_OK;
+}
+
+int Flash_ReadConfig(Flash_Config_t *cfg)
+{
+	Flash_Config_t *ptr = (Flash_Config_t *)CONFIG_FLASH_ADDRESS;
+    *cfg = *ptr;
+    return 1;
+}
+
+void Software_Reset(void)
+{
+    HAL_NVIC_SystemReset();
 }
 /* USER CODE END 4 */
 
@@ -407,12 +481,18 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 #endif
 	}
 
-#if(MY_ROLE == TAG)
+
 	if(htim->Instance == TIM4){
 		//anchor_absence
+		DISABLE_TIMER4();
+#if(MY_ROLE == TAG)
 		Tag_lose_anchor();
-	}
+#else
+		enqueueTask(Log_Data, 0);
+
 #endif
+	}
+
 
   /* USER CODE END Callback 1 */
 }

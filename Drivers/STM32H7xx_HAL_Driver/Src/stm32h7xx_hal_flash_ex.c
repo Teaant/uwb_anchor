@@ -254,6 +254,7 @@ HAL_StatusTypeDef HAL_FLASHEx_Erase(FLASH_EraseInitTypeDef *pEraseInit, uint32_t
       *SectorError = 0xFFFFFFFFU;
 
       /* Erase by sector by sector to be done*/
+
       for(sector_index = pEraseInit->Sector; sector_index < (pEraseInit->NbSectors + pEraseInit->Sector); sector_index++)
       {
         FLASH_Erase_Sector(sector_index, pEraseInit->Banks, pEraseInit->VoltageRange);

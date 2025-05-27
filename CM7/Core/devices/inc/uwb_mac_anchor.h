@@ -45,6 +45,8 @@ typedef struct{
 	uint16_t Slots[4];
 #endif
 
+	uint8_t comm_range;
+
 	Times_Struct_t anchor_times; //一些时间点 ~
 
 	uint64_t resp_tx_time;
@@ -74,6 +76,8 @@ void timer6_callback(void);
 
 //可以在这个里边Upload_Date
 void calculate_distance(uint16_t index);
+
+void Log_Data(uint16_t id);
 
 void Upload_Data(uint8_t index);
 

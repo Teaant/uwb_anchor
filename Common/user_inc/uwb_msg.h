@@ -12,34 +12,6 @@
 
 #define MAX_TAG			48
 
-typedef enum{
-	beacon_frame = 0,
-	data_frame = 1,
-	ack_frame = 2,
-	mac_cmd_frame = 3,
-	compound_frame = 5,
-}Frame_Type_t;
-
-typedef enum{
-	//定位
-	UWB_Ranging_Poll = 0,
-	UWB_Ranging_Resp,
-	UWB_Ranging_Final,
-	UWB_Ranging_Ack,
-
-	UWB_App_Data,
-
-	UWB_Cmd_Req = 0x11,
-	UWB_Cmd_Sync = 0x12,
-
-}Frame_Function_t;  //功能
-
-
-typedef enum{
-	initiator = 0,
-	responder = 1,
-}UWB_Ranging_Role;
-
 /**
  * 定义消息结构体
  */
@@ -108,7 +80,7 @@ typedef enum{
 
 //数据包载荷的字节大小
 #define POLL_PAYLOAD_LEN		(0+1+2)	//功能码 + FCS
-#define RESP_PAYLOAD_LEN		(0+1+6+2)  //还有三个ID呢
+#define RESP_PAYLOAD_LEN		(0+1+6+1+2)  //还有三个ID呢
 #define FINAL_PAYLOAD_LEN		(24+1+2)
 #define ACK_PAYLOAD_LEN			(32+1+2) //距离(4)，方向角(2/4)，高度(2), 速度，偏航角yaw
 
@@ -123,6 +95,39 @@ typedef enum{
 #define	JOIN_REQ_PAYLOAD_LEN	(1+1+2)
 
 #define REQ_ACK_MSG_LEN		(UWB_MAC_HEADER_LEN + JOIN_REQ_PAYLOAD_LEN)
+
+
+typedef enum{
+	beacon_frame = 0,
+	data_frame = 1,
+	ack_frame = 2,
+	mac_cmd_frame = 3,
+	compound_frame = 5,
+}Frame_Type_t;
+
+typedef enum{
+	//定位
+	UWB_Ranging_Poll = 0,
+	UWB_Ranging_Resp,
+	UWB_Ranging_Final,
+	UWB_Ranging_Ack,
+
+	UWB_App_Data,
+
+	UWB_Cmd_Req = 0x11,
+	UWB_Cmd_Sync = 0x12,
+	UWB_Cmd_Power = 0x13,
+	UWB_Cmd_Wifi = 0x14,
+	UWB_Cmd_Interval = 0x15,
+	UWB_Cmd_Range = 0x16,
+
+}Frame_Function_t;  //功能
+
+
+typedef enum{
+	initiator = 0,
+	responder = 1,
+}UWB_Ranging_Role;
 
 
 #pragma pack(1)
@@ -188,6 +193,7 @@ typedef struct{
 	uint16_t ID1;
 	uint16_t ID2;
 	uint16_t ID3;
+	uint8_t switches;
 }UWB_Date_Resp_t;
 
 typedef struct{

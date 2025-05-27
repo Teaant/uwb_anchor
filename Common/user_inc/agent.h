@@ -13,7 +13,7 @@
 #define 	PAN_ID				(0x3737)
 
 #if(MY_ROLE == ANCHOR)
-#define 	MY_ID				(0xBBEE)
+#define 	MY_ID				(0xBBAA)
 #else
 #define 	MY_ID				(0xCC22)
 #endif

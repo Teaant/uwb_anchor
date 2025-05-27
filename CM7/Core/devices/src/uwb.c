@@ -22,8 +22,13 @@ volatile uint8_t rx_times = 0;
 /* Default communication configuration. We use here EVK1000's default mode (mode 3). */
 
 #define MIN_POWER	1
+//但是85是为?
+__attribute__((aligned(4))) Flash_Config_t flash_config = {
+		.tx_power = DEFAULT_TX_POWER,
+		.tcp_server = 2,
+		.tag_interval = INTERVAL,
 
-
+};
 /**
  */
 static dwt_config_t config = {
@@ -66,11 +71,12 @@ static uint16_t TX_Buffers[4] = {TX_BUFFER_1, TX_BUFFER_2, TX_BUFFER_3, TX_BUFFE
 
 int32_t uwbInit(uint16_t ID)
 {
+
 	////min : C0   max:1F	 //with 85 default and nothing special ~
 #if(MIN_POWER)
 	dwt_txconfig_t config_t = {
 			.PGdly = 0xC2,
-			.power = 0x85C0C085 }; //1110 0000
+			.power = flash_config.tx_power}; //1110 0000
 #else
 	dwt_txconfig_t config_t = {
 				.PGdly = 0xC2,

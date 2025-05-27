@@ -80,6 +80,10 @@ void Error_Handler(void);
 
 /* USER CODE BEGIN Private defines */
 
+
+
+void Software_Reset(void);
+
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

@@ -43,6 +43,22 @@ typedef struct
 } UWBDef;
 
 
+//需要8个32位的
+typedef struct{
+
+	uint32_t tx_power;
+	uint32_t tcp_server;
+	uint32_t tag_interval;
+	uint32_t comm_range;
+	uint32_t config5;
+	uint32_t config6;
+	uint32_t config7;
+	uint32_t config8;
+
+}Flash_Config_t;
+
+HAL_StatusTypeDef Flash_WriteConfig(Flash_Config_t *cfg);
+int Flash_ReadConfig(Flash_Config_t *cfg);
 
 
 int32_t uwbInit(uint16_t ID);

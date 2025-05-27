@@ -5,7 +5,7 @@
  *      Author: 24848
  */
 
-#include <uwb_mac.h>
+#include "uwb_mac.h"
 #include "tim.h"
 #include "uwb_mac_tag.h"
 #include "task_manager.h"
@@ -40,21 +40,48 @@ volatile Tag_Struct_t tag_struct= {
 		.timer15_callback = wakeup_tag,
 };
 
+extern Flash_Config_t	flash_config;
 
 void initTag(void){
 
 	uwb_node.state = initial;
 	uwb_node.ptag_struct = &tag_struct;
 
+	tag_struct.interval = flash_config.tag_interval;
 	//wake_up time
 	//TIM15的时钟频率
-	uwb_node.wakeup_time = (INTERVAL -1) * 10000 + 9000;   //若是很大的呢？ 暂时只考虑6以内？  900ms行哈，有100ms的雨量，那我就150ms
+	uwb_node.wakeup_time = (tag_struct.interval -1) * 10000 + 9000;   //若是很大的呢？ 暂时只考虑6以内？  900ms行哈，有100ms的雨量，那我就150ms
 
 	register_tx_cb(applying, applying_txDone_cb);
 	register_tx_cb(polling, poll_txDone_cb);
 	register_tx_cb(finaling, final_txDone_cb);
 
 
+}
+
+static void update_interval(uint16_t interval){
+
+	flash_config.tag_interval = interval;
+	if(Flash_WriteConfig(&flash_config) == HAL_OK){
+		Software_Reset();
+	}else{
+		//keep Rxing
+		UWB_ENABLE_RX(&uwb_node.device->ports[0]);
+	}
+}
+
+static void update_tx_power(uint16_t power){
+
+	uint8_t interval = (uint8_t)power;
+
+	flash_config.tx_power = (uint32_t)interval << 24 | (uint32_t)interval << 16
+            | (uint32_t)interval << 8  | interval;
+	if(Flash_WriteConfig(&flash_config) == HAL_OK){
+		Software_Reset();
+	}else{
+		//keep Rxing
+		UWB_ENABLE_RX(&uwb_node.device->ports[0]);
+	}
 }
 
 void tag_parse_ranging(uint64_t rx_ts) {
@@ -70,7 +97,7 @@ void tag_parse_ranging(uint64_t rx_ts) {
 	case beacon_frame:
 #if(ENABLE_SYNC)
 		UWB_Sync_Header_t * sync_header = (UWB_Sync_Header_t*)(tag_struct.rxBuffer + UWB_MAC_HEADER_LEN);
-		uint16_t* pID = (uint16_t*)(&sync_header->bop_0);
+		uint16_t* pID = sync_header->Slots;
 		uint8_t bop ;
 		for(bop = 0; bop < 4; bop++){
 			if(*(pID+bop) == pheader->src) {
@@ -132,12 +159,24 @@ void tag_parse_ranging(uint64_t rx_ts) {
 		break;
 	case mac_cmd_frame:
 		//MAC控制帧
-//		enqueueTask(uwb_handle_mac, pheader->src);
+		UWB_Mac_Payload_t * pmac = (UWB_Mac_Payload_t*)(tag_struct.rxBuffer + sizeof(UWB_Msg_Header_t));
+		switch(pmac->function){
+		case UWB_Cmd_Interval:
+			enqueueTask(update_interval, (uint16_t)pmac->interval);
+			break;
+		case UWB_Cmd_Power:
+			enqueueTask(update_tx_power, (uint16_t)pmac->interval);
+			break;
+		default:
+			break;
+		}
 		break;
 	default:
 		break;
 	}
 }
+
+
 
 void prepare_join(uint16_t id){
 
@@ -153,7 +192,7 @@ void prepare_join(uint16_t id){
 	joing_msg->header.src = MY_ID;
 
 	joing_msg->payload.function = UWB_Cmd_Req;
-	joing_msg->payload.interval = INTERVAL;
+	joing_msg->payload.interval = uwb_node.ptag_struct->interval;
 	//schedule
 	uint64_t delatT = (uint64_t)MS_2 * (tag_struct.cap_start + 2 * random_slot);
 	uint64_t req_tx_time = getSumT(tag_struct.beacon_start_time, delatT);
@@ -205,7 +244,7 @@ void uwb_handle_beacon(uint16_t id){
 			}
 		}
 		ranging_anchor_values.pnode->slot_alloc.miss ++;
-		if(ranging_anchor_values.pnode->slot_alloc.miss > INTERVAL + 2){
+		if(ranging_anchor_values.pnode->slot_alloc.miss > tag_struct.interval + 2){
 			//outside了
 			uwb_node.state = initial;
 			ranging_anchor_values.pnode->slot_alloc.miss = 0;

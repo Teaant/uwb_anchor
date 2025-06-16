@@ -476,13 +476,13 @@ void prepare_beacon(uint16_t id){
 	memcpy((uint8_t*)(pbeacon->sync_header.Slots), (uint8_t*)(anchor_struct.Slots), 4 * sizeof(uint16_t));
 
 #if(LOG_WHAT == LOG_SLOT)
-	uin32_t rand = uwb_node.get_rand();
-	rand = rand % TIMER4_50MS;
-	ENABLE_TIMER4_ARR(rand);
+//	uint32_t rand = uwb_node.get_rand();
+//	rand = rand % TIMER4_50MS;
+//	ENABLE_TIMER4_ARR(rand);
 //	//ref_id, my_slot, my_level, Slots
-//	printf("0x%x,0x%x,%d,%d,0x%x,0x%x,0x%x,0x%x\r\n", MY_ID, anchor_struct.ref_id, anchor_struct.my_slot, anchor_struct.level,
-//			anchor_struct.Slots[0], anchor_struct.Slots[1],
-//			anchor_struct.Slots[2], anchor_struct.Slots[3]);
+	printf("0x%x,0x%x,%d,%d,0x%x,0x%x,0x%x,0x%x\r\n", MY_ID, anchor_struct.ref_id, anchor_struct.my_slot, anchor_struct.level,
+			anchor_struct.Slots[0], anchor_struct.Slots[1],
+			anchor_struct.Slots[2], anchor_struct.Slots[3]);
 #endif
 
 #endif

@@ -272,6 +272,7 @@ void Connect_Wifi(void){
 	//查看版本信息
 	printf("AT+GMR\r\n");
 	HAL_Delay(500);   //好像必须要有一个这个吗？
+
 	//设置 ESP32 设备的 Wi-Fi 模式
 	/*
 	 * 	0: 无 Wi-Fi 模式，并且关闭 Wi-Fi RF

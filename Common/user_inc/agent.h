@@ -13,7 +13,7 @@
 #define 	PAN_ID				(0x3737)
 
 #if(MY_ROLE == ANCHOR)
-#define 	MY_ID				(0xBB44)
+#define 	MY_ID				(0xBB88)
 #else
 #define 	MY_ID				(0xCC22)
 #endif
@@ -30,12 +30,10 @@
 #endif
 
 
-
-
 #define INTERVAL		(2)
 //保留过去N组位移和距离信息
 //那么线性方程组矩阵有N-1阶
-# define N 50
+#define N 50
 
 #define	MAX_NODE	48
 

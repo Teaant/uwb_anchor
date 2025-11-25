@@ -103,7 +103,6 @@ void initAnchor(void){
 	for(int i = 0; i < MAX_TAG; i++){
 		memset((uint8_t*)(ranging_tags_value+i), 0, sizeof(UWB_RangingValue_t));
 	}
-
 	init_mem_pool();
 
 	//register txDone Callback
@@ -131,7 +130,6 @@ void anchor_parse_ranging(uint16_t microSlot){
 	uint8_t sequence = pheader->sequence;
 
 	if (pheader->dist != MY_ID && pheader->dist != 0xFFFF){
-		//计算当前的时候， 如果属于resp时间段，那就那就不必打开接收 ~
 		release_msg_buffer(pmsg);
 		return;
 	}
@@ -165,6 +163,7 @@ void anchor_parse_ranging(uint16_t microSlot){
 					ranging_tags_value[i].pnode->slot_alloc.absence = 0;
 //					ranging_tags_value[i].sequence = sequence;
 					ranging_tags_value[i].poll_rx_ts = pmsg->rx_ts;
+//					接收到poll帧
 					ranging_tags_value[i].is_valid = 1;
 					release_msg_buffer(pmsg);
 					return;
@@ -189,7 +188,7 @@ void anchor_parse_ranging(uint16_t microSlot){
 			}
 			break;
 		default:
-			//计算当前的时候， 如果属于resp时间段，那就那就不必打开接收 ~
+			//计算当前的时候， 如果属于resp时间段，那就不必打开接收 ~
 			break;
 		}
 		break;
@@ -209,11 +208,9 @@ void anchor_parse_ranging(uint16_t microSlot){
 				anchor_struct.req_ack_buffer.header.sequence = sequence;
 				anchor_struct.req_ack_buffer.payload.function = UWB_Cmd_Req;
 				anchor_struct.req_ack_buffer.payload.interval = interval;
-				//晚一点呢？ 能很快的嘛？ 是不是会很快啊，我看一下吧 ~
 				add_new_tag(src_id, interval);
-				//还是增加2ms吧？ 感觉实在是有点快乐会不会？
 				uint64_t tx_time = getSumT(pmsg->rx_ts, MS_2);
-				UWB_Anchor_Ack_Req((uint8_t*)(&anchor_struct.req_ack_buffer), REQ_ACK_MSG_LEN);
+				UWB_Anchor_Ack_Req((uint8_t*)(&anchor_struct.req_ack_buffer), REQ_ACK_MSG_LEN, tx_time);
 			}
 			break;
 		case UWB_Cmd_Sync:
@@ -282,7 +279,6 @@ void anchor_parse_ranging(uint16_t microSlot){
 
 void beacon_txdone_cb(uint64_t tx_ts){
 
-
 	if (ranging_num == 0) {
 		uwb_node.state = non_ranging;
 	} else {
@@ -297,8 +293,8 @@ void beacon_txdone_cb(uint64_t tx_ts){
 			ENABLE_TIMER6_ARR(TIMER6_10MS);
 		}
 #else
-			ENABLE_TIMER2_ARR(TIMER6_10MS);
-		#endif
+		ENABLE_TIMER2_ARR(TIMER6_10MS);
+#endif   //SYNC
 #endif
 		//计算resp
 		anchor_struct.resp_tx_time = getSumT(anchor_struct.anchor_times.Start_Beacon, MS_14);
@@ -314,11 +310,9 @@ void beacon_txdone_cb(uint64_t tx_ts){
 	anchor_struct.anchor_times.Next_Beacon = getSumT(tx_ts, S_TO_DWT_TIME);
 
 	ENABLE_TIMER15_ARR(TIMER15_0_9S);	//把后续余量改为100ms
-
 }
 
 
-//锚节点应该是没什么问题的，现在看一下到底是不是标签的问题 ~
 void resp_txdone_cb(uint64_t tx_ts){
 
 	for(int i = (ranging_group_num-1) * 3 ; i < ranging_group_num * 3; i++){
@@ -351,13 +345,14 @@ void configure_resp_to_dw1000(uint16_t id){
 	uint16_t* pID = &resp_buffer.ID1;
 
 	for(int i = 0; i < 3; i++){
+//		接收到了标签的poll   is_valid
 		if(ranging_tags_value[(ranging_group_num-1)*3+i].pnode && ranging_tags_value[(ranging_group_num-1)*3+i].is_valid == 1){
 			*(pID+i) = ranging_tags_value[(ranging_group_num-1)*3].pnode->slot_alloc.node_id;
-
 			if(ranging_tags_value[(ranging_group_num-1)*3+i].pnode->slot_alloc.if_switch == 1){
 				resp_buffer.switches |= (1<<i);
 			}
 		}else {
+//			占位
 			*(pID+i) = MY_ID;
 		};
 	}
@@ -504,7 +499,7 @@ void prepare_beacon(uint16_t id){
 			} else {
 				p->slot_alloc.time_to_locate = p->slot_alloc.interval;
 				ranging_tags_value[ranging_num].pnode = p;
-				ranging_tags_value[ranging_num].is_valid = 1; //记得结束之后应该把这个标志清除掉
+				ranging_tags_value[ranging_num].is_valid = 0; //记得结束之后应该把这个标志清除掉，此处应该是0来着的吧？
 				ranging_tags_value[ranging_num].is_available = 0;
 				pbeacon->payload.IDs[ranging_num] = p->slot_alloc.node_id;
 				aoa_data[ranging_num].src_car_id = p->slot_alloc.node_id;
@@ -730,16 +725,15 @@ static void anchor_master(uint16_t anchor_id, uint16_t anchor_pan, const UWB_Syn
 		// < 350ms，把时间往后再往后推迟1s，在不破坏当前超帧的情况下继续完成下面的
 		else{
 			DISABLE_TIMER15();
-			ENABLE_TIMER15_ARR(TIMER15_1_3S);  //3ms之后
+			ENABLE_TIMER15_ARR(TIMER15_1_3S);  //1.3s之后
 			anchor_struct.anchor_times.Next_Beacon = getSumT(beacon_tx, S_TO_DWT_TIME);
 		}
 	}else{
 		DISABLE_TIMER15();
 		uwb_node.state = non_ranging;
-		ENABLE_TIMER15_ARR(TIMER15_0_4S);  //3ms之后
+		ENABLE_TIMER15_ARR(TIMER15_0_4S);  //400ms之后
 		anchor_struct.anchor_times.Next_Beacon = beacon_tx;
 	}
-
 }
 
 static uint8_t anchor_slave(uint16_t anchor_id, uint16_t anchor_pan, const UWB_Sync_Header_t* sync_header, uint64_t rx_ts){
@@ -772,7 +766,7 @@ static uint8_t anchor_slave(uint16_t anchor_id, uint16_t anchor_pan, const UWB_S
 	printf("I hear a slave anchor.\r\n");
 #endif
 	if(uwb_node.state == initial){
-
+//		所谓的非破坏性就是在这边的？
 		/**
 		 * 1. 取消Issue_beacon的定时器
 		 * 2. 找到自己的Slot，填充Sync相关信息
@@ -844,6 +838,7 @@ SameSlave:
 		}
 		break;
 	case 2:
+//		这里其实应该可以计算这个信号的强度来决定是否把节点放进来？
 		for(int i = 0; i< 2; i++){
 			if(anchor_struct.neighbors[i] == anchor_id){
 				//那就不需要改动了哈，保持原样 ~
@@ -852,7 +847,6 @@ SameSlave:
 				other_slot = anchor_struct.neighbor_slots[i];
 			}
 		}
-		//未曾
 #if(USE_LOG)
 		printf("Something is wrong, there are two many neighbors.\r\n");
 #endif

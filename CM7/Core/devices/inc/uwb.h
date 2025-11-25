@@ -103,7 +103,7 @@ void issue_resp(void);
 
 void UWB_StartTx_in_Addr(uint8_t is_expect, uint8_t len, uint8_t addr);
 
-void UWB_Anchor_Ack_Req(uint8_t* pdata, uint8_t len);
+void UWB_Anchor_Ack_Req(uint8_t* pdata, uint8_t len, uint64_t tx_time);
 
 void UWB_Tag_Send_Ranging(uint8_t* pdata, uint8_t len, uint64_t tx_time);
 void UWB_Tag_Req_Join(uint8_t* pdata, uint8_t len, uint64_t tx_time);

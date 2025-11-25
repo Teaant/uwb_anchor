@@ -488,7 +488,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 #if(MY_ROLE == TAG)
 		Tag_lose_anchor();
 #else
-		enqueueTask(Log_Data, 0);
+//		enqueueTask(Log_Data, 0);
 
 #endif
 	}

@@ -69,10 +69,10 @@ extern volatile uint8_t flag;
 int32_t uwbInit(uint16_t ID) {
 
 	//min : C0   max:1F	 //with 85 default and nothing special ~
-	dwt_txconfig_t config_t = {
-			.PGdly = 0xC2,
-			.power = 0x851F1F85
-	}; //1110 0000
+//	dwt_txconfig_t config_t = {
+//			.PGdly = 0xC2,
+//			.power = 0x851F1F85
+//	}; //1110 0000
 
 	initOtherPorts();
 
@@ -140,7 +140,6 @@ int32_t uwbInit(uint16_t ID) {
 		/* Set Sync to OSTR*/
 		dwt_setecctrl(EC_CTRL_OSTRM, pports);
 	}
-
 	return 0;
 }
 
@@ -334,7 +333,6 @@ void process_pdoa(uint16_t id){
 		pdoa_diags[i].src_id = 0xFFFF;
 		pdoa_diags[i].Diag[0].avalible = 0;
 		pdoa_diags[i].Diag[1].avalible = 0;
-
 	}
 	//重新使能接收
 	enable_pdoa();

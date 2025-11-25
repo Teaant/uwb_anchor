@@ -550,14 +550,14 @@ void issue_resp(void) {
 
 }
 
-void UWB_Anchor_Ack_Req(uint8_t* pdata, uint8_t len){
+void UWB_Anchor_Ack_Req(uint8_t* pdata, uint8_t len, uint64_t tx_time){
 
 	UWBPortTypeDef *pports = &(UWB.ports[0]);
 
 	dwt_forcetrxoff(pports); // Turn the RX off
 	dwt_rxreset(pports);
-//	uint32_t delayed_time =(uint32_t)(tx_time >> 8);   //取高八位   //暂时不采用延迟发送 ~
-//	dwt_setdelayedtrxtime(delayed_time, pports);
+	uint32_t delayed_time =(uint32_t)(tx_time >> 8);   //取高八位   //暂时不采用延迟发送 ~
+	dwt_setdelayedtrxtime(delayed_time, pports);
 
 	dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS, pports);
 

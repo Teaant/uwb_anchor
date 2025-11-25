@@ -14,6 +14,26 @@
 
 #if(MY_ROLE == TAG)
 
+//但是模拟出的多个标签，可是要在同一个anchor下面呢吗？
+//看看是否有类似的实现呢？
+//关闭 MAC地址过滤
+//MAX_TAG_NUM
+#if(MULTI_TAG)
+//之前是有9辆车
+#define MAX_TAG_NUM		10
+
+#endif
+//id从MY_ID增加2，TAG ID进行划分
+//interval的控制也不好控制，那这个时候就直接全部1，因为本身也是在测试容量，直接挑最大的了
+//So many works waiting for completing
+#ifdef INTERVAL
+#undef INTERVAL
+#define INTERVAL	1
+//相应的数据结构也要进行更改，那就是10个的吗？ 1024，每一个分100 B~
+//1. ID信息以及时间戳信息，expect_tx, real_tx
+#endif
+
+
 
 UWB_RangingValue_t ranging_anchor_values;
 
@@ -177,7 +197,6 @@ void tag_parse_ranging(uint64_t rx_ts) {
 }
 
 
-
 void prepare_join(uint16_t id){
 
 	//根据自己的ID选择一个ALOHA时隙发送请求
@@ -220,7 +239,6 @@ static void request_timeout(void){
 		uwb_node.state = initial;
 	}
 }
-
 
 void uwb_handle_beacon(uint16_t id){
 
@@ -329,10 +347,8 @@ static void poll_txDone_cb(uint64_t tx_ts){
 //过在进入了resp_timeout ?
 static void resp_timeout(void){
 
-	//看下当前时间
-	//但是当下的时间，这个时间好像不对啊？
-	uint64_t now_time = get_sys_timestamp(&uwb_node.device->ports[0]);
-	uwb_node.state = sleeping;   //当前应该是处于RX模式的啊？为啥?什么个事？  //为什么3ms就没有了？ 是那么情况哎？
+//	uint64_t now_time = get_sys_timestamp(&uwb_node.device->ports[0]);
+	uwb_node.state = sleeping;   //当前应该是处于RX模式的啊？为啥?什么个事？  //为什么3ms就没有了？ 是那么情况哎？ —— 定时器的锅，没有复位CNT
 	UWB_DISABLE_RX(&uwb_node.device->ports[0]);
 
 }
@@ -343,6 +359,7 @@ static void wakeup_tag(void){
 	UWB_ENABLE_RX(&uwb_node.device->ports[0]);
 	ENABLE_TIMER4();
 }
+
 
 static void final_txDone_cb(uint64_t tx_ts){
 	//go to sleep
@@ -431,7 +448,4 @@ void valid_anchor(uint16_t id){
 
 }
 
-
 #endif
-
-

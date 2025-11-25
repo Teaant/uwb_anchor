@@ -62,17 +62,17 @@ extern TIM_HandleTypeDef htim15;
 #define DISABLE_TIMER6()		__HAL_TIM_DISABLE(&htim6);\
 								__HAL_TIM_SET_COUNTER(&htim6, 0)
 
+
 #define ENABLE_TIMER15()		__HAL_TIM_CLEAR_FLAG(&htim15, TIM_FLAG_UPDATE);\
 								__HAL_TIM_ENABLE(&htim15)
-
-
 
 #define TIMER15_5S				49999
 #define TIMER15_1_3S			12999
 #define TIMER15_1_4S			13999
 #define TIMER15_1S				9999
 #define TIMER15_0_3S			2999
-#define TIMER15_0_4S			4999
+//检出错误：3999之前写成了4999导致计算出的下一时间已经过了定时器到时的
+#define TIMER15_0_4S			3999
 #define TIMER15_0_8S			7999
 #define TIMER15_0_9S			8999
 

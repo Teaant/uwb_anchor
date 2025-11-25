@@ -10,6 +10,8 @@
 
 #include "main.h"
 
+#define MULTI_TAG	1
+
 typedef void(*tag_timer_callback)(void);
 
 typedef struct{

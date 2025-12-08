@@ -107,7 +107,7 @@ int32_t uwbInit(uint16_t ID)
     	UWB.ports[i].avalible = 0;
 
     }
-    for(int i=0;i<DWT_NUM_DW_DEV;i++)
+    for(int i = 0;i < DWT_NUM_DW_DEV;i++)
     {
     	UWBPortTypeDef *pports = &UWB.ports[i];
     	int trys = 10;

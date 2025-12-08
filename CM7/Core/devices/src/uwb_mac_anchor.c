@@ -27,10 +27,11 @@
 #define LOG_SLOT	2
 #define LOG_DATA	3
 
-#define LOG_WHAT	LOG_SLOT
+#define LOG_WHAT	LOG_DATA
 
-
-
+#if(USE_WIFI)
+#define USE_LOG		0
+#endif
 
 extern volatile UWB_Node_t uwb_node;
 
@@ -223,7 +224,9 @@ void anchor_parse_ranging(uint16_t microSlot){
 #endif
 			break;
 		case UWB_Cmd_Power:
+#if(USE_LOG)
 			printf("receive tx_power config with power = 0x%x. \r\n", interval);
+#endif
 			flash_config.tx_power = (uint32_t)interval << 24 | (uint32_t)interval << 16
 		             | (uint32_t)interval << 8  | interval;
 			if(Flash_WriteConfig(&flash_config) == HAL_OK){
@@ -231,7 +234,9 @@ void anchor_parse_ranging(uint16_t microSlot){
 			}
 			break;
 		case UWB_Cmd_Wifi:
+#if(USE_LOG)
 			printf("receive server config with server = %d. old = %ld.\r\n", interval, flash_config.tcp_server);
+#endif
 			if(interval != flash_config.tcp_server){
 				if(interval == 1 || interval ==2){
 					flash_config.tcp_server = interval;
@@ -347,7 +352,7 @@ void configure_resp_to_dw1000(uint16_t id){
 	for(int i = 0; i < 3; i++){
 //		接收到了标签的poll   is_valid
 		if(ranging_tags_value[(ranging_group_num-1)*3+i].pnode && ranging_tags_value[(ranging_group_num-1)*3+i].is_valid == 1){
-			*(pID+i) = ranging_tags_value[(ranging_group_num-1)*3].pnode->slot_alloc.node_id;
+			*(pID+i) = ranging_tags_value[(ranging_group_num-1)*3+i].pnode->slot_alloc.node_id;
 			if(ranging_tags_value[(ranging_group_num-1)*3+i].pnode->slot_alloc.if_switch == 1){
 				resp_buffer.switches |= (1<<i);
 			}
@@ -427,12 +432,14 @@ void calculate_distance(uint16_t index){
 
 
 __weak void Upload_Data(uint8_t index){
+#if(LOG_WHAT == LOG_DATA)
 	//时间戳也打印一下看看，到底什么情况哎 ~
 	if(aoa_data[index].avalible == 1 && isnormal(aoa_data[index].theta)){
 		printf("%d,%.2f,%.2f\r\n", ranging_tags_value[index].pnode->slot_alloc.node_id, ranging_tags_value[index].distance, aoa_data[index].theta);
 	}else{
 		printf("%d,%.2f,N\r\n", ranging_tags_value[index].pnode->slot_alloc.node_id, ranging_tags_value[index].distance);
 	}
+#endif
 }
 /**
  * 1. pack beacon数据包 并且写入DW1000芯片

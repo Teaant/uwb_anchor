@@ -15,18 +15,13 @@
 #if(MY_ROLE == ANCHOR)
 #define 	MY_ID				(0xBB88)
 #else
-#define 	MY_ID				(0xCC22)
+#define 	MY_ID				(0xBB22)
 #endif
 
 #if(MY_ROLE == TAG)
 #define USE_WIFI	0
 #else
 #define USE_WIFI	1
-#endif
-
-
-#if(USE_WIFI)
-#define USE_LOG		0
 #endif
 
 

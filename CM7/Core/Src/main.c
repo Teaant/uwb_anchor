@@ -250,9 +250,9 @@ int main(void)
 		if (uwb_node.device->ports[i].avalible == 1) {
 			/* Set expected response's delay and timeout. See NOTE 4, 5 and 6 below.
 			 * As this example only handles one incoming frame with always the same delay and timeout, those values can be set here once for all. */
-//#if(USE_LOG)
-//			printf("DW1000 init successful.\r\n");
-//#endif
+#if(USE_LOG)
+			printf("DW1000 init successful.\r\n");
+#endif
 			dwt_setrxaftertxdelay(0,  &uwb_node.device->ports[i]);
 			dwt_setrxtimeout(0, &uwb_node.device->ports[i]);
 			HAL_NVIC_ClearPendingIRQ(uwb_node.device->ports[i].exti_line);

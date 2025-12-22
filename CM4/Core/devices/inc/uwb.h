@@ -9,7 +9,7 @@
 #include "dwio.h"
 #include "main.h"
 
-
+#include "agent.h"
 
 
 typedef struct
@@ -37,6 +37,8 @@ void rxToCallback(const dwt_cb_data_t *, UWBPortTypeDef *);
 void rxErrCallback(const dwt_cb_data_t *, UWBPortTypeDef *);
 
 void process_pdoa(uint16_t id);
+
+void process_data_diag(PDoA_Struct_t* pdiag);
 
 void enable_pdoa(void);
 void disable_pdoa(void);

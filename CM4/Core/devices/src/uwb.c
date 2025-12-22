@@ -59,9 +59,11 @@ extern volatile PDoA_Frame_t rxBuffer;
 static void initOtherPorts(void);
 
 static void anchor_parse_pdoa( UWBPortTypeDef *pports, uint16_t id, uint8_t index);
-
+static void anchor_parse_pdoa_final(UWBPortTypeDef *pports, uint16_t id, uint8_t index);
 
 extern volatile uint8_t flag;
+
+extern volatile uint8_t ranging_num;
 /**
  * @TODO done 物理层的初始化
  * SPI， 帧过滤相关等
@@ -199,14 +201,19 @@ void rxOkCallback_PDoA(const dwt_cb_data_t* cdata, UWBPortTypeDef *pports) {
 
 	uint8_t frame_type = GET_FRAMETYPE(rxBuffer.header.control);
 
-	if (frame_type != data_frame || rxBuffer.header.dist != MY_ID || rxBuffer.function != UWB_Ranging_Poll){
+	if (frame_type != data_frame || rxBuffer.header.dist != MY_ID ){
 		/* Activate reception immediately. */
 		dwt_rxenable(DWT_START_RX_IMMEDIATE , pports);
 		return;
 	}
-	flag++;
-	anchor_parse_pdoa(pports, rxBuffer.header.src, pdoa_id);
-
+	if( rxBuffer.function == UWB_Ranging_Poll){
+		anchor_parse_pdoa(pports, rxBuffer.header.src, pdoa_id);
+	}
+#if(USE_TWO_PDOA)
+	else if( rxBuffer.function == UWB_Ranging_Final){
+		anchor_parse_pdoa_final(pports, rxBuffer.header.src, pdoa_id);
+	}
+#endif
 	dwt_rxenable(DWT_START_RX_IMMEDIATE , pports);
 	//也不知这段时间需要多少？
 
@@ -243,6 +250,14 @@ static float uwb_get_fp_angle(uint16_t fp_index, UWBPortTypeDef *pports) {
 void anchor_parse_pdoa(UWBPortTypeDef *pports, uint16_t id, uint8_t index) {
 
 	volatile PDoA_Struct_t* pdiag = NULL;
+#if(USE_TWO_PDOA)
+	for(int i = 0 ; i < ranging_num ; i++){
+		if(aoa_data[i].src_car_id == id){
+			pdiag = &aoa_data[i].diag[0];
+			break;
+		}
+	}
+#else
 	//找到空白的
 	for(int i = 0 ; i< 3; i++){
 		//一定最开始使用的是
@@ -253,6 +268,7 @@ void anchor_parse_pdoa(UWBPortTypeDef *pports, uint16_t id, uint8_t index) {
 			break;
 		}
 	}
+#endif
 	if(pdiag == NULL) return;
 
 	dwt_readrcphase(&(pdiag->Diag[index-1].rcphase), pports);
@@ -272,7 +288,28 @@ void anchor_parse_pdoa(UWBPortTypeDef *pports, uint16_t id, uint8_t index) {
 
 }
 
-//是不是好像没与办法正常接收到的啊？
+#if(USE_TWO_PDOA)
+void anchor_parse_pdoa_final(UWBPortTypeDef *pports, uint16_t id, uint8_t index) {
+
+	volatile PDoA_Struct_t* pdiag = NULL;
+	for(int i = 0 ; i < ranging_num; i++){
+		if(aoa_data[i].src_car_id == id){
+			 pdiag = &aoa_data[i].diag[1];
+			 break;
+		}
+	}
+	if(pdiag == NULL) return;
+	dwt_readrcphase(&(pdiag->Diag[index-1].rcphase), pports);
+	dwt_readdiagnostics(&(pdiag->Diag[index-1].tempDiag), pports);
+	pdiag->Diag[index-1].fp_index = (uint16_t) round(((float) (pdiag->Diag[index-1].tempDiag.firstPath & 0x3F) / 0x3F))
+			+ (pdiag->Diag[index-1].tempDiag.firstPath >> 6);
+	pdiag->Diag[index-1].fp_angle = uwb_get_fp_angle(pdiag->Diag[index-1].fp_index, pports);
+	pdiag->Diag[index-1].avalible = 1;
+
+}
+#endif
+
+
 void process_pdoa(uint16_t id){
 
 	//这个到底有什么不一样的地方吗?
@@ -338,6 +375,51 @@ void process_pdoa(uint16_t id){
 	enable_pdoa();
 
 }
+
+#if(USE_TWO_PDOA)
+void process_data_diag(PDoA_Struct_t* pdiag){
+
+	pdiag->processed = 1;
+	volatile AoADiagnosticTypeDef* pdw1, *pdw2;
+	float temp;
+	for (int j = 0; j < 2; j++) {
+		pdiag->Diag[j].phi = pdiag->Diag[j].fp_angle;
+		pdiag->Diag[j].beta = (float) pdiag->Diag[j].rcphase
+				/ 64.0 * PI;
+	}
+	pdw1 = pdiag->Diag;
+	pdw2 = pdiag->Diag +1;
+
+	temp = (pdw1->phi - pdw1->beta) - (pdw2->phi - pdw2->beta) + PI;
+	while (temp >= PI2) {
+		temp -= PI2;
+	}
+	while (temp < 0) {
+		temp += PI2;
+	}
+	temp -= PI;   // 所以，范围在（-PI, PI）
+	if (isnormal(temp)) {  //不应该不对吧？
+		//				if (1){
+		//找到对应的节点 ~  0.07492
+		pdiag->phase  = temp;
+		pdiag->phase_m = pdiag->phase * (LAMDA_M / 2.0 / PI);
+		//此处进行一个限幅操作
+		if (pdiag->phase_m > D_M) {
+			pdiag->alpha = 1.0;
+			pdiag->theta = 90.0;
+			pdiag->available = 1;
+		}
+		if (pdiag->phase_m < ND_M) {
+			pdiag->alpha = -1.0;
+			pdiag->theta = -90.0;
+			pdiag->available = 1;
+		}
+		pdiag->alpha = pdiag->phase_m / D_M;
+		pdiag->theta = asinf(pdiag->alpha) / PI * 180.0;
+		pdiag->available = 1;
+	}
+}
+#endif
 
 void rxToCallback(const dwt_cb_data_t *cbData, UWBPortTypeDef *pports) {
 	/* Clear reception timeout to start next ranging process. */

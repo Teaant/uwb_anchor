@@ -33,10 +33,11 @@
 #define USE_LOG		0
 #endif
 
+
 extern volatile UWB_Node_t uwb_node;
 
 extern volatile AoADataTypeDef aoa_data[MAX_TAG];
-
+extern volatile  uint16_t wait_index;
 
 volatile static uint8_t tags_num = 0;   //实施记录当前有多少的节点 ~
 volatile slot_alloc_node_t* tags_table = NULL;
@@ -69,6 +70,7 @@ extern Flash_Config_t flash_config;
 
 volatile Anchor_Struct_t anchor_struct = {
 #if(ENABLE_SYNC)
+		.log_slot = 0,
 		.ref_id = MY_ID,
 		.level = 0,
 		.master_slot = 0,
@@ -87,6 +89,7 @@ void initAnchor(void){
 	tags_table = NULL;
 
 	anchor_struct.comm_range = flash_config.comm_range;
+	anchor_struct.log_slot = flash_config.log_slot;
 
 	anchor_struct.req_ack_buffer.header.control = ACK_FRAME_CONTROL;
 	anchor_struct.req_ack_buffer.header.pan_id = PAN_ID;
@@ -175,8 +178,9 @@ void anchor_parse_ranging(uint16_t microSlot){
 #if(!USE_TIMER)
 			enable_rx_with_timeout(0);
 #endif
+			// ？
 			for (int i = 3 * (ranging_group_num-2); i < 3 * (ranging_group_num -1); i++) {
-				if (ranging_tags_value[i].pnode->slot_alloc.node_id == src_id && ranging_tags_value[i].is_valid == 1) {
+				if (ranging_tags_value[i].pnode && ranging_tags_value[i].pnode && ranging_tags_value[i].pnode->slot_alloc.node_id == src_id && ranging_tags_value[i].is_valid == 1) {
 					ranging_tags_value[i].pnode->slot_alloc.absence = 0;
 					ranging_tags_value[i].final_rx_ts = pmsg->rx_ts;
 					ranging_tags_value[i].poll_tx_ts = ppayload->final_payload.poll_tx_ts;
@@ -201,6 +205,7 @@ void anchor_parse_ranging(uint16_t microSlot){
 		}
 		UWB_Mac_Payload_t * pmac = (UWB_Mac_Payload_t*)(pmsg->rcv_data + sizeof(UWB_Msg_Header_t));
 		uint8_t interval = pmac->interval;
+		uint8_t interval2 = pmac->interval2;
 		switch(pmac->function){
 		case UWB_Cmd_Req:
 			if(tags_num < MAX_TAG){
@@ -249,7 +254,25 @@ void anchor_parse_ranging(uint16_t microSlot){
 		case UWB_Cmd_Range:
 			anchor_struct.comm_range = interval;
 			flash_config.comm_range = interval;
-			Flash_WriteConfig(&flash_config);
+			if (Flash_WriteConfig(&flash_config) == HAL_OK) {
+				Software_Reset();	//或许只需要重新连接Server
+			}
+			break;
+		case UBW_Cmd_Log:
+#if(ENABLE_SYNC)
+			anchor_struct.log_slot = interval;
+			flash_config.log_slot = interval;
+			if (Flash_WriteConfig(&flash_config) == HAL_OK) {
+				Software_Reset();	//或许只需要重新连接Server
+			}
+			break;
+#endif
+		case UWB_Cmd_Delay:
+			uint16_t delay = ((uint16_t)pmac->interval2)<<8 | pmac->interval;
+			flash_config.ant_delay = delay;
+			if (Flash_WriteConfig(&flash_config) == HAL_OK) {
+				Software_Reset();	//或许只需要重新连接Server
+			}
 			break;
 		default:
 			break;
@@ -329,9 +352,10 @@ void resp_txdone_cb(uint64_t tx_ts){
 		uwb_node.state = non_ranging;
 		//不再需要schedule timer的了
 		//同时也，关闭PDOA
+#if(!USE_TWO_PDOA)
 		DISABLE_TIMER6();
 		Notify_CM4(Disable_PDoA);
-
+#endif
 	} else {
 		//write in the tx_buffer of DW1000
 		anchor_struct.resp_tx_time = getSumT(anchor_struct.resp_tx_time, MS_18);
@@ -349,6 +373,7 @@ void configure_resp_to_dw1000(uint16_t id){
 
 	uint16_t* pID = &resp_buffer.ID1;
 
+	//这边是不是会数组越界的啊，你看看这边有点奇怪的
 	for(int i = 0; i < 3; i++){
 //		接收到了标签的poll   is_valid
 		if(ranging_tags_value[(ranging_group_num-1)*3+i].pnode && ranging_tags_value[(ranging_group_num-1)*3+i].is_valid == 1){
@@ -366,7 +391,6 @@ void configure_resp_to_dw1000(uint16_t id){
 }
 
 static void stest_resp(uint16_t id){
-
 	configure_resp_to_dw1000(0);
 	issue_resp();
 }
@@ -391,11 +415,20 @@ void timer6_callback(void){
 	if(uwb_node.state == ranging){   	  //通知开启 ~  //通知关闭 ~
 		//issue Resp
 		ENABLE_TIMER6_ARR(TIMER6_18MS);
+#if(!USE_TWO_PDOA)
 		Notify_CM4(Process_PDoA);
+#endif
 		enqueueTask(stest_resp, 0);
 //		configure_resp_to_dw1000(0);
 //		issue_resp();  //直接发送了 ~
 	}
+#if(USE_TWO_PDOA)
+	else{
+		Notify_CM4(Disable_PDoA);
+		//然后就可以知道开始process
+		enqueueTask(Upload_Data, 0);
+	}
+#endif
 }
 
 
@@ -426,20 +459,50 @@ void calculate_distance(uint16_t index){
 	 * @TODO  Upload data
 	 * 还有角度信息需要从CM4内核当中去获取
 	 */
+#if(USE_TWO_PDOA)
+#else
 	Upload_Data(index);
-
+#endif
 }
 
 
-__weak void Upload_Data(uint8_t index){
+__weak void Upload_Data(uint16_t index){
+//如果说因为什么原因导致一直没有，那岂不是要一直等的？
+#if(USE_TWO_PDOA)
+	float re = 0.0;
+	uint8_t num = 0;
+	for(int i = 0; i < ranging_num; i++){
+		if(ranging_tags_value[i].is_available == 0) continue;
+		if(aoa_data[i].avalible == 1){
+			re = 0.0;
+			num = 0;
+			for(int j = 0; j < 2; j++){
+				if (aoa_data[i].diag[j].available && isnormal(aoa_data[i].diag[j].theta)) {
+					re += aoa_data[i].diag[j].theta;
+					num += 1;
+				}
+			}
+			re = (float) re / num;
+			if(isnormal(re)){
+				printf("%d,%.2f,%.2f,%d\r\n",  ranging_tags_value[i].pnode->slot_alloc.node_id, ranging_tags_value[i].distance, re, uwb_node.id);
+			}else{
+				printf("%d,%.2f,N,%d\r\n",  ranging_tags_value[i].pnode->slot_alloc.node_id, ranging_tags_value[i].distance,uwb_node.id);
+			}
+		}else{
+			printf("%d,%.2f,N,%d\r\n",  ranging_tags_value[i].pnode->slot_alloc.node_id, ranging_tags_value[i].distance,uwb_node.id);
+		}
+	}
+#else
 #if(LOG_WHAT == LOG_DATA)
 	//时间戳也打印一下看看，到底什么情况哎 ~
 	if(aoa_data[index].avalible == 1 && isnormal(aoa_data[index].theta)){
-		printf("%d,%.2f,%.2f\r\n", ranging_tags_value[index].pnode->slot_alloc.node_id, ranging_tags_value[index].distance, aoa_data[index].theta);
+		printf("%d,%.2f,%.2f,%d\r\n", ranging_tags_value[index].pnode->slot_alloc.node_id, ranging_tags_value[index].distance, aoa_data[index].theta, uwb_node.id);
 	}else{
-		printf("%d,%.2f,N\r\n", ranging_tags_value[index].pnode->slot_alloc.node_id, ranging_tags_value[index].distance);
+		printf("%d,%.2f,N,%d\r\n",  ranging_tags_value[index].pnode->slot_alloc.node_id, ranging_tags_value[index].distance,uwb_node.id);
 	}
 #endif
+#endif
+
 }
 /**
  * 1. pack beacon数据包 并且写入DW1000芯片
@@ -477,18 +540,12 @@ void prepare_beacon(uint16_t id){
 	pbeacon->sync_header.level = uwb_node.panchor_struct->level;
 	memcpy((uint8_t*)(pbeacon->sync_header.Slots), (uint8_t*)(anchor_struct.Slots), 4 * sizeof(uint16_t));
 
-#if(LOG_WHAT == LOG_SLOT)
-//	uint32_t rand = uwb_node.get_rand();
-//	rand = rand % TIMER4_50MS;
-//	ENABLE_TIMER4_ARR(rand);
-//	//ref_id, my_slot, my_level, Slots
-	printf("0x%x,0x%x,%d,%d,0x%x,0x%x,0x%x,0x%x\r\n", MY_ID, anchor_struct.ref_id, anchor_struct.my_slot, anchor_struct.level,
-			anchor_struct.Slots[0], anchor_struct.Slots[1],
-			anchor_struct.Slots[2], anchor_struct.Slots[3]);
+	if(anchor_struct.log_slot == 1){
+		printf("0x%x,0x%x,%d,%d,0x%x,0x%x,0x%x,0x%x\r\n", MY_ID, anchor_struct.ref_id, anchor_struct.my_slot, anchor_struct.level,
+				anchor_struct.Slots[0], anchor_struct.Slots[1],
+				anchor_struct.Slots[2], anchor_struct.Slots[3]);
+	}
 #endif
-
-#endif
-
 	//先更新一下标签表
 	refresh_table();
 
@@ -569,17 +626,13 @@ void issue_beacon(uint16_t id){
 	pbeacon->sync_header.level = uwb_node.panchor_struct->level;
 	memcpy((uint8_t*)(pbeacon->sync_header.Slots), (uint8_t*)(anchor_struct.Slots), 4 * sizeof(uint16_t));
 
-#if(LOG_WHAT == LOG_SLOT)
-	//ref_id, my_slot, my_level, Slots
-	printf("0x%x,0x%x,%d,%d,0x%x,0x%x,0x%x,0x%x\r\n", MY_ID,anchor_struct.ref_id, anchor_struct.my_slot, anchor_struct.level,
-			anchor_struct.Slots[0], anchor_struct.Slots[1],
-			anchor_struct.Slots[2], anchor_struct.Slots[3]);
+	if(anchor_struct.log_slot == 1){
+		printf("0x%x,0x%x,%d,%d,0x%x,0x%x,0x%x,0x%x\r\n", MY_ID,anchor_struct.ref_id, anchor_struct.my_slot, anchor_struct.level,
+				anchor_struct.Slots[0], anchor_struct.Slots[1],
+				anchor_struct.Slots[2], anchor_struct.Slots[3]);
+	}
 #endif
-
-#endif
-
 	//查看Ranging_tags_value当中，哪一些没有is_available的，absence++
-
 	//先更新一下标签表
 	refresh_table();
 
@@ -781,13 +834,15 @@ static uint8_t anchor_slave(uint16_t anchor_id, uint16_t anchor_pan, const UWB_S
 		 */
 		DISABLE_TIMER15();
 		uwb_node.state = non_ranging;
-		//把slave添加到我的neighbor当中
+		// 应该先把原本的设置为0xFFFF  2025.12.11
+		anchor_struct.Slots[anchor_struct.my_slot] = 0xFFFF;
+		// 把slave添加到我的neighbor当中
 		anchor_struct.neighbors[0] = anchor_id;
 		anchor_struct.neighbor_slots[0] = slave_slot;
 		anchor_struct.neighbor_num = 1;
 		anchor_struct.Slots[slave_slot] = anchor_id;
-
-		anchor_struct.Slots[anchor_struct.my_slot] = 0xFFFF;
+		// 2025.12.11 删
+//		anchor_struct.Slots[anchor_struct.my_slot] = 0xFFFF;
 
 		if (my_slot != -1) {
 			//掉线后重新上电
@@ -823,7 +878,7 @@ static uint8_t anchor_slave(uint16_t anchor_id, uint16_t anchor_pan, const UWB_S
 		anchor_struct.neighbors[0] = anchor_id;
 		anchor_struct.neighbor_num = 1;
 SameSlave:
-		if((slave_slot&0x02) != (anchor_struct.my_slot&0x02)){   //尽量非破坏性？ 但是我是不会与之同步时间的。
+		if((slave_slot&0x02) != (anchor_struct.my_slot&0x02)){//尽量非破坏性？ 但是我是不会与之同步时间的。
 			anchor_struct.neighbor_slots[0] = slave_slot;
 			anchor_struct.Slots[slave_slot] = anchor_id;
 		}else{

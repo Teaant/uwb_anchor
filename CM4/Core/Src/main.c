@@ -62,6 +62,8 @@
 /* USER CODE BEGIN PV */
 volatile AoADataTypeDef aoa_data[MAX_TAG] __attribute__ ((section(".shared")));
 volatile PDoA_Struct_t pdoa_diags[3] __attribute__ ((section(".shared")));
+volatile uint8_t wait_index = 0xFF;
+volatile uint8_t ok_index = 0xFF;
 
 volatile uint8_t ranging_num __attribute__ ((section(".shared")));
 
@@ -74,6 +76,8 @@ __attribute__ ((section(".shared"))) volatile uint32_t error_status = 0;
 __attribute__ ((section(".shared"))) volatile PDoA_Frame_t rxBuffer;
 
 extern UWBDef UWB;
+
+volatile uint8_t is_positioning = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -154,11 +158,26 @@ int main(void)
 
   U_Task u_task = NULL;
   uint16_t para = 0;
+  PDoA_Struct_t * pdiag = NULL;
 	while (1) {
 		u_task = dequeueTask(&para);
 		if(u_task){
 			u_task(para);
 		}
+#if(USE_TWO_PDOA)
+		if(is_positioning == 0) continue;
+		for(int i = 0; i < ranging_num; i++){
+			for(int j = 0; j < 2; j++){
+				pdiag = &aoa_data[i].diag[j];
+				if (pdiag->processed == 0
+						&& pdiag->Diag[0].avalible
+						&& pdiag->Diag[1].avalible) {
+					process_data_diag(pdiag);
+					aoa_data[i].avalible = 1;   //处理过那就是可以的了
+				}
+			}
+		}
+#endif
 
     /* USER CODE END WHILE */
 
@@ -173,10 +192,12 @@ void HAL_HSEM_FreeCallback(uint32_t statusreg){
 
 	if(__HAL_HSEM_SEMID_TO_MASK(Enable_PDoA) & statusreg){
 		enable_pdoa();
+		is_positioning = 1;
 		HAL_GPIO_TogglePin(LED2_GPIO_Port, LED2_Pin);
 	}
 	if(__HAL_HSEM_SEMID_TO_MASK(Disable_PDoA) & statusreg){
 		disable_pdoa();
+		is_positioning = 0;
 	}
 
 	if (__HAL_HSEM_SEMID_TO_MASK(Process_PDoA) & statusreg) {

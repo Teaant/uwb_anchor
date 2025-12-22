@@ -4,6 +4,8 @@
 #include "main.h"
 #include <stdlib.h>
 #include <string.h>
+
+#include "agent.h"
 ////HSEM
 //#define GET_TARGET_ANG_HSEM 20
 //#define GET_ACC_MEM_HSEM 21
@@ -31,13 +33,16 @@
 
 #define	NEW_CONFIG_427_4	4
 
+
 enum Hsem_enum{
 
 	Enable_PDoA = 5,
 	Disable_PDoA,
 	Process_PDoA,
+	Available_PDoA,
 
 };
+
 
 typedef int32_t (*writeBuffer_t) (void*,int);
 typedef int32_t (*readBuffer_t) (void*,int);
@@ -77,6 +82,9 @@ typedef struct{
 	float power;
 	uint16_t src_car_id;
 	uint8_t avalible;
+#if(USE_TWO_PDOA)
+	PDoA_Struct_t diag[2];
+#endif
 }AoADataTypeDef;
 
 
@@ -84,6 +92,7 @@ typedef struct{
 int32_t bufferInit();
 int32_t writeBuffer(void*, int);
 int32_t readBuffer(void*, int);
+uint8_t getIndex();
 int32_t genInterrupt(int32_t);
 int32_t actInterrupt(int32_t);
 int32_t actCM7Interrupt(int32_t n);

@@ -79,6 +79,9 @@ volatile int8_t enableCM4 = 0;
 
 volatile AoADataTypeDef aoa_data[MAX_TAG] __attribute__ ((section(".shared")));
 volatile PDoA_Struct_t pdoa_diags[3] __attribute__ ((section(".shared")));
+volatile uint16_t wait_index = 0xFF;
+volatile uint16_t ok_index = 0xFF;
+
 
 volatile uint8_t ranging_num __attribute__ ((section(".shared")));
 
@@ -209,22 +212,37 @@ int main(void)
 	}
 
 	if(Flash_ReadConfig(&flash_config)){
-		if(flash_config.tx_power == 0xFFFFFFFF
-				|| flash_config.tcp_server == 0xFFFFFFFF
-				|| flash_config.tag_interval == 0xFFFFFFFF
-				|| flash_config.comm_range == 0xFFFFFFFF){
-			printf("first time to flash config, write default.\r\n");
+		uint8_t need_write = 0;
+		if(flash_config.tx_power == 0xFFFFFFFF){
+			need_write = 1;
 			flash_config.tx_power = DEFAULT_TX_POWER;
+		}
+		if(flash_config.tcp_server == 0xFFFFFFFF){
+			need_write = 1;
 			flash_config.tcp_server = 1;
+		}
+		if(flash_config.tag_interval == 0xFFFFFFFF){
+			need_write = 1;
 			flash_config.tag_interval = INTERVAL;
+		}
+		if(flash_config.comm_range == 0xFFFFFFFF){
+			need_write = 1;
 			flash_config.comm_range = COMM_RANGE;
+		}
+		if(flash_config.ant_delay == 0xFFFFFFFF){
+			need_write = 1;
+			flash_config.ant_delay = DEFAULT_ANT_DELAY;
+		}
+		if(flash_config.log_slot == 0xFFFFFFFF){
+			need_write = 1;
+			flash_config.log_slot = 0;
+		}
+		if(need_write == 1){
 			if(Flash_WriteConfig(&flash_config) == HAL_OK){
 				printf("write to flash success.\r\n");
 			}else{
 				printf("write to flash fail.\r\n");
 			}
-		}else{
-			printf("read config.\r\n");
 		}
 	}
 

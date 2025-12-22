@@ -103,6 +103,15 @@ static void update_tx_power(uint16_t power){
 		UWB_ENABLE_RX(&uwb_node.device->ports[0]);
 	}
 }
+static void update_ant_delay(uint16_t delay){
+	flash_config.ant_delay = delay;
+	if(Flash_WriteConfig(&flash_config) == HAL_OK){
+		Software_Reset();
+	}else{
+		//keep Rxing
+		UWB_ENABLE_RX(&uwb_node.device->ports[0]);
+	}
+}
 
 void tag_parse_ranging(uint64_t rx_ts) {
 
@@ -187,6 +196,10 @@ void tag_parse_ranging(uint64_t rx_ts) {
 		case UWB_Cmd_Power:
 			enqueueTask(update_tx_power, (uint16_t)pmac->interval);
 			break;
+		case UWB_Cmd_Delay:
+			uint16_t delay = ((uint16_t)pmac->interval2)<<8 | pmac->interval;
+			enqueueTask(update_ant_delay, delay);
+			break;
 		default:
 			break;
 		}
@@ -213,7 +226,7 @@ void prepare_join(uint16_t id){
 	joing_msg->payload.function = UWB_Cmd_Req;
 	joing_msg->payload.interval = uwb_node.ptag_struct->interval;
 	//schedule
-	uint64_t delatT = (uint64_t)MS_2 * (tag_struct.cap_start + 2 * random_slot);
+	uint64_t delatT = (uint64_t)MS_2 * (uint64_t)(tag_struct.cap_start + 2 * random_slot);
 	uint64_t req_tx_time = getSumT(tag_struct.beacon_start_time, delatT);
 
 	UWB_Tag_Req_Join((uint8_t*)tag_struct.txBuffer, REQ_ACK_MSG_LEN, req_tx_time&TX_TIME_MASK);
@@ -249,12 +262,14 @@ void uwb_handle_beacon(uint16_t id){
 	if(ranging_anchor_values.pnode->slot_alloc.node_id == id){
 		//stop the absence timer ~
 		DISABLE_TIMER4();
+		uint64_t delta = 0;
 		for(int i = 0; i< pbeacon->Ntags; i++){
 			if(*(pTags+i) == uwb_node.id){
 				ranging_anchor_values.pnode->slot_alloc.miss = 0; //清除不良记录
 				tag_struct.macro = i+1;
 				tag_struct.micro1 = GET_MICRO_SLOT1(i+1);
-				tag_struct.poll_tx_time = getSumT(tag_struct.beacon_start_time, MS_2 * tag_struct.micro1);
+				delta = MS_2 * (uint64_t)tag_struct.micro1;
+				tag_struct.poll_tx_time = getSumT(tag_struct.beacon_start_time, delta);
 //				tag_struct.poll_tx_time &= TX_TIME_MASK;
 				prepare_poll(id);
 				ENABLE_TIMER15_ARR(uwb_node.wakeup_time);	//set for the next ranging
@@ -308,6 +323,7 @@ void prepare_final(uint16_t id){
 
 	pfinal->final_payload.poll_tx_ts = ranging_anchor_values.poll_tx_ts;
 	pfinal->final_payload.resp_rx_ts = ranging_anchor_values.resp_rx_ts;
+
 	//这个果然是有一点影响的
 	pfinal->final_payload.final_tx_ts = getSumT(tag_struct.final_tx_time, uwb_node.device->antDelay);
 
@@ -331,7 +347,8 @@ static void after_poll(uint16_t id) {
 	UWB_ENABLE_DELAY_RX(1000, &uwb_node.device->ports[0]);
 	tag_struct.timer6_callback = resp_timeout;
 	tag_struct.micro3 = GET_MICRO_SLOT3(tag_struct.macro);//这需要很久吗？
-	tag_struct.final_tx_time = getSumT(tag_struct.beacon_start_time, MS_2 * tag_struct.micro3);
+	uint64_t delta = MS_2 * (uint64_t)tag_struct.micro3;
+	tag_struct.final_tx_time = getSumT(tag_struct.beacon_start_time, delta);
 	tag_struct.final_tx_time &= TX_TIME_MASK;
 
 }

@@ -12,10 +12,12 @@
 
 #define 	PAN_ID				(0x3737)
 
+#define USE_TWO_PDOA	1
+
 #if(MY_ROLE == ANCHOR)
 #define 	MY_ID				(0xBB88)
 #else
-#define 	MY_ID				(0xBB22)
+#define 	MY_ID				(0xBB11)
 #endif
 
 #if(MY_ROLE == TAG)
@@ -110,7 +112,19 @@ typedef struct{
 
 typedef struct{
 	uint8_t is_used;
+	uint8_t available;
 	uint16_t src_id;
+
+#if(USE_TWO_PDOA)
+	float phase;
+	float phase_m;
+	float theta;
+	float alpha;
+	float normalized_amp;
+	float raw_amp;
+	float power;
+	uint8_t processed;
+#endif
 	AoADiagnosticTypeDef Diag[2];
 }PDoA_Struct_t;
 //Tanya_end

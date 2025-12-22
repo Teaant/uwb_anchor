@@ -23,7 +23,7 @@ volatile uint8_t rx_times = 0;
 
 #define MIN_POWER	1
 //但是85是为?
-__attribute__((aligned(4))) Flash_Config_t flash_config = {
+volatile __attribute__((aligned(4))) Flash_Config_t flash_config = {
 		.tx_power = DEFAULT_TX_POWER,
 		.tcp_server = 2,
 		.tag_interval = INTERVAL,
@@ -84,6 +84,7 @@ int32_t uwbInit(uint16_t ID)
 		};   //1110 0000
 #endif
 
+	UWB.antDelay = flash_config.ant_delay;
 
     UWB.ports[0].hspi = &hspi6;
     UWB.ports[0].irq_pin = UWB_IRQn_Pin;
@@ -165,8 +166,8 @@ int32_t uwbInit(uint16_t ID)
 		//end
 #endif
 		/* Apply default antenna delay value. See NOTE 1 below. */
-		dwt_setrxantennadelay(RX_ANT_DLY, pports);
-		dwt_settxantennadelay(TX_ANT_DLY, pports);
+		dwt_setrxantennadelay(UWB.antDelay, pports);
+		dwt_settxantennadelay(UWB.antDelay, pports);
 
 		/* Set preamble timeout for expected frames. See NOTE 6 below. */
 		dwt_setpreambledetecttimeout(PRE_TIMEOUT, pports);

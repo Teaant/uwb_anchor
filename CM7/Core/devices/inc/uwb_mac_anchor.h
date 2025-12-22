@@ -35,6 +35,7 @@ typedef struct{
 typedef struct{
 
 #if(ENABLE_SYNC)
+	uint8_t log_slot;
 	uint16_t ref_id;
 	uint8_t level;
 	uint8_t my_slot; //bop 1,2,3,4  //那还是0123呗
@@ -79,7 +80,7 @@ void calculate_distance(uint16_t index);
 
 void Log_Data(uint16_t id);
 
-void Upload_Data(uint8_t index);
+void Upload_Data(uint16_t index);
 
 void test_add_node(uint16_t id, uint8_t interval);
 

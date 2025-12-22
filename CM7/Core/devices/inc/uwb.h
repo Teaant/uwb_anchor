@@ -50,8 +50,8 @@ typedef struct{
 	uint32_t tcp_server;
 	uint32_t tag_interval;
 	uint32_t comm_range;
-	uint32_t config5;
-	uint32_t config6;
+	uint32_t ant_delay;
+	uint32_t log_slot;
 	uint32_t config7;
 	uint32_t config8;
 

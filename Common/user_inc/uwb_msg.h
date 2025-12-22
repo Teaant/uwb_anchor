@@ -93,8 +93,10 @@
 #define ACK_MSG_LEN				(UWB_MAC_HEADER_LEN + ACK_PAYLOAD_LEN)
 
 #define	JOIN_REQ_PAYLOAD_LEN	(1+1+2)
-
 #define REQ_ACK_MSG_LEN		(UWB_MAC_HEADER_LEN + JOIN_REQ_PAYLOAD_LEN)
+
+
+#define MAC_COMMAN_MSG_LEN 	(UWB_MAC_HEADER_LEN + 1 + 2)
 
 
 typedef enum{
@@ -120,6 +122,8 @@ typedef enum{
 	UWB_Cmd_Wifi = 0x14,
 	UWB_Cmd_Interval = 0x15,
 	UWB_Cmd_Range = 0x16,
+	UWB_Cmd_Delay = 0x17,
+	UBW_Cmd_Log = 0x18,
 
 }Frame_Function_t;  //功能
 
@@ -209,6 +213,7 @@ typedef struct{
 
 	uint8_t function;
 	uint8_t interval;
+	uint8_t interval2;
 
 }UWB_Mac_Payload_t;
 
